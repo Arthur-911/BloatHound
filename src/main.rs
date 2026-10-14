@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use dev_cleaner::{cleaner, explorer, inspector, scanner, ui};
+use dev_cleaner::{cleaner, explorer, inspector, models::Verdict, scanner, ui};
 use dialoguer::Confirm;
 use std::io::Write;
 use std::path::PathBuf;
@@ -51,6 +51,18 @@ enum Commands {
     Open {
         /// Folder path to open
         path: PathBuf,
+    },
+
+    /// Scan and evaluate whether files are needed or safe to delete
+    #[command(alias = "check")]
+    Audit {
+        /// Target directory to audit (defaults to current folder)
+        #[arg(default_value = ".")]
+        path: PathBuf,
+
+        /// Automatically purge all folders marked NOT NEEDED without asking
+        #[arg(short, long)]
+        yes: bool,
     },
 
     /// Purge disposable artifact directories to reclaim disk space
@@ -180,6 +192,55 @@ fn main() {
             if let Err(e) = explorer::open_in_file_explorer(&path) {
                 eprintln!("\nError: {}", e);
                 std::process::exit(1);
+            }
+        }
+
+        Commands::Audit { path, yes } => {
+            println!("\nAuditing workspace for file necessity: {}", path.display());
+
+            let artifacts = match scanner::scan_directory(&path, 10) {
+                Ok(a) => a,
+                Err(e) => {
+                    eprintln!("\nError scanning path: {}", e);
+                    std::process::exit(1);
+                }
+            };
+
+            if artifacts.is_empty() {
+                println!("\nAll clean! No disposable artifacts found.");
+                return;
+            }
+
+            ui::display_audit_report(&artifacts);
+
+            let not_needed: Vec<_> = artifacts
+                .into_iter()
+                .filter(|a| a.assess_necessity().0 == Verdict::NotNeeded)
+                .collect();
+
+            if not_needed.is_empty() {
+                println!("\nAll detected folders are currently active. None are marked [NOT NEEDED].");
+                return;
+            }
+
+            let proceed = if yes {
+                true
+            } else {
+                Confirm::new()
+                    .with_prompt(format!(
+                        "\nWould you like to safely purge all {} NOT NEEDED folders now?",
+                        not_needed.len()
+                    ))
+                    .default(false)
+                    .interact()
+                    .unwrap_or(false)
+            };
+
+            if proceed {
+                let result = cleaner::purge_artifacts(&not_needed, false);
+                ui::display_clean_summary(&result);
+            } else {
+                println!("\nNo files were deleted.");
             }
         }
 

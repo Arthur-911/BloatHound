@@ -109,6 +109,7 @@ fn test_cleaner_safety_block_on_arbitrary_folder() {
         created_at: None,
         accessed_at: None,
         modified_at: None,
+        recreate_cmd: "test".to_string(),
     };
 
     let result = purge_artifact(&info, false);
@@ -121,4 +122,37 @@ fn test_open_in_file_explorer_nonexistent() {
     let fake_path = std::path::Path::new("C:\\fake_path_that_does_not_exist_xyz123");
     let res = open_in_file_explorer(fake_path);
     assert!(res.is_err());
+}
+
+#[test]
+fn test_assess_necessity() {
+    use dev_cleaner::models::Verdict;
+    use chrono::{Duration, Local};
+
+    // Active artifact (1 day ago)
+    let recent = Local::now() - Duration::days(1);
+    let mut info = ArtifactInfo {
+        path: std::path::PathBuf::from("."),
+        project_name: "active_proj".to_string(),
+        category: "Node.js".to_string(),
+        pattern: "node_modules".to_string(),
+        size_bytes: 1000,
+        file_count: 10,
+        created_at: Some(recent),
+        accessed_at: Some(recent),
+        modified_at: Some(recent),
+        recreate_cmd: "npm install".to_string(),
+    };
+
+    let (v_recent, _) = info.assess_necessity();
+    assert_eq!(v_recent, Verdict::KeepActive);
+
+    // Old inactive artifact (90 days ago)
+    let old = Local::now() - Duration::days(90);
+    info.accessed_at = Some(old);
+    info.modified_at = Some(old);
+
+    let (v_old, reason) = info.assess_necessity();
+    assert_eq!(v_old, Verdict::NotNeeded);
+    assert!(reason.contains("npm install"));
 }

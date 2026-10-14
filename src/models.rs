@@ -1,6 +1,13 @@
 use chrono::{DateTime, Local};
 use std::path::PathBuf;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Verdict {
+    NotNeeded,   // Inactive > 30 days: safe to purge
+    Review,      // Inactive 14 - 30 days
+    KeepActive,  // Active <= 14 days: needed for active development
+}
+
 #[derive(Debug, Clone)]
 pub struct ArtifactInfo {
     pub path: PathBuf,
@@ -12,6 +19,7 @@ pub struct ArtifactInfo {
     pub created_at: Option<DateTime<Local>>,
     pub accessed_at: Option<DateTime<Local>>,
     pub modified_at: Option<DateTime<Local>>,
+    pub recreate_cmd: String,
 }
 
 #[derive(Debug, Clone)]
@@ -82,6 +90,59 @@ impl ArtifactInfo {
 
     pub fn modified_str(&self) -> String {
         format_time_relative(self.modified_at)
+    }
+
+    /// Evaluates whether the artifact is currently needed based on recent activity.
+    pub fn assess_necessity(&self) -> (Verdict, String) {
+        let latest_activity = match (self.accessed_at, self.modified_at) {
+            (Some(a), Some(m)) => Some(a.max(m)),
+            (Some(a), None) => Some(a),
+            (None, Some(m)) => Some(m),
+            (None, None) => None,
+        };
+
+        match latest_activity {
+            Some(dt) => {
+                let now = Local::now();
+                let days = now.signed_duration_since(dt).num_days();
+
+                if days <= 14 {
+                    (
+                        Verdict::KeepActive,
+                        format!("Active ({}d ago) - Needed for current development.", days),
+                    )
+                } else if days <= 30 {
+                    (
+                        Verdict::Review,
+                        format!("Inactive for {}d - Review before purging.", days),
+                    )
+                } else {
+                    (
+                        Verdict::NotNeeded,
+                        format!(
+                            "Not needed (untouched for {}d). Safe to purge. Recreate with: '{}'.",
+                            days, self.recreate_cmd
+                        ),
+                    )
+                }
+            }
+            None => (
+                Verdict::NotNeeded,
+                format!(
+                    "Not needed (no recent activity recorded). Recreate with: '{}'.",
+                    self.recreate_cmd
+                ),
+            ),
+        }
+    }
+
+    pub fn verdict_badge(&self) -> (&'static str, &'static str) {
+        let (verdict, _) = self.assess_necessity();
+        match verdict {
+            Verdict::NotNeeded => ("NOT NEEDED", "red"),
+            Verdict::Review => ("REVIEW", "yellow"),
+            Verdict::KeepActive => ("KEEP / ACTIVE", "green"),
+        }
     }
 }
 

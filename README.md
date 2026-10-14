@@ -65,19 +65,31 @@ dev-cleaner scan "C:\path\to\projects"
 ```
 After scanning, simply type the row number (e.g., `1` or `5`) to immediately pop open that folder in File Explorer!
 
-### 2. Direct Open Command
+### 2. Intelligent Necessity Audit
+Scan and evaluate whether folders are needed or safe to delete based on activity recency:
+```bash
+dev-cleaner audit
+# or
+dev-cleaner check "C:\path\to\projects"
+```
+Categorizes all folders into:
+- 🔴 **NOT NEEDED (Safe to Delete):** Untouched for > 30 days. Tells you how to recreate it anytime.
+- 🟡 **REVIEW:** Inactive for 14–30 days.
+- 🟢 **KEEP / ACTIVE:** Active within 14 days. Avoids re-downloading packages for active projects.
+
+### 3. Direct Open Command
 Open any project folder on your PC directly:
 ```bash
 dev-cleaner open "C:\path\to\project\target"
 ```
 
-### 3. Detailed File Breakdown
+### 4. Detailed File Breakdown
 View individual files inside the detected artifacts with their creation, access, and modified dates:
 ```bash
 dev-cleaner scan . --detailed
 ```
 
-### 4. Deep-Inspect a Specific Artifact Folder
+### 5. Deep-Inspect a Specific Artifact Folder
 See a sorted list of the largest files inside an artifact folder:
 ```bash
 dev-cleaner inspect "path/to/project/node_modules" --limit 20
