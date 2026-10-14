@@ -92,14 +92,11 @@ impl ArtifactInfo {
         format_time_relative(self.modified_at)
     }
 
-    /// Evaluates whether the artifact is currently needed based on recent activity.
+    /// Evaluates whether the artifact is currently needed based on recent write/modification activity.
     pub fn assess_necessity(&self) -> (Verdict, String) {
-        let latest_activity = match (self.accessed_at, self.modified_at) {
-            (Some(a), Some(m)) => Some(a.max(m)),
-            (Some(a), None) => Some(a),
-            (None, Some(m)) => Some(m),
-            (None, None) => None,
-        };
+        // Modification time (mtime) is the most reliable indicator of real developer activity.
+        // Access times (atime) can be artificially bumped by antivirus, backup tools, or scanners.
+        let latest_activity = self.modified_at.or(self.accessed_at);
 
         match latest_activity {
             Some(dt) => {
@@ -129,7 +126,7 @@ impl ArtifactInfo {
             None => (
                 Verdict::NotNeeded,
                 format!(
-                    "Not needed (no recent activity recorded). Recreate with: '{}'.",
+                    "Not needed (no modification history found). Recreate with: '{}'.",
                     self.recreate_cmd
                 ),
             ),

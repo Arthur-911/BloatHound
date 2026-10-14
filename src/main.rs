@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use dev_cleaner::{cleaner, explorer, inspector, models::Verdict, scanner, ui};
+use dev_cleaner::{analyzer, cleaner, explorer, inspector, scanner, ui};
 use dialoguer::Confirm;
 use std::io::Write;
 use std::path::PathBuf;
@@ -53,14 +53,14 @@ enum Commands {
         path: PathBuf,
     },
 
-    /// Scan and evaluate whether files are needed or safe to delete
-    #[command(alias = "check")]
-    Audit {
-        /// Target directory to audit (defaults to current folder)
+    /// Analyze whether folders are connected to project files and if deleting matters
+    #[command(alias = "check", alias = "audit")]
+    Analyze {
+        /// Target directory to analyze (defaults to current folder)
         #[arg(default_value = ".")]
         path: PathBuf,
 
-        /// Automatically purge all folders marked NOT NEEDED without asking
+        /// Automatically purge all folders that do not matter without asking
         #[arg(short, long)]
         yes: bool,
     },
@@ -195,8 +195,8 @@ fn main() {
             }
         }
 
-        Commands::Audit { path, yes } => {
-            println!("\nAuditing workspace for file necessity: {}", path.display());
+        Commands::Analyze { path, yes } => {
+            println!("\nAnalyzing workspace for project connections and deletion impact: {}", path.display());
 
             let artifacts = match scanner::scan_directory(&path, 10) {
                 Ok(a) => a,
@@ -207,19 +207,19 @@ fn main() {
             };
 
             if artifacts.is_empty() {
-                println!("\nAll clean! No disposable artifacts found.");
+                println!("\nAll clean! No artifacts found.");
                 return;
             }
 
-            ui::display_audit_report(&artifacts);
+            ui::display_integrity_analysis_table(&artifacts);
 
-            let not_needed: Vec<_> = artifacts
+            let does_not_matter: Vec<_> = artifacts
                 .into_iter()
-                .filter(|a| a.assess_necessity().0 == Verdict::NotNeeded)
+                .filter(|a| !analyzer::analyze_folder_integrity(a).is_needed)
                 .collect();
 
-            if not_needed.is_empty() {
-                println!("\nAll detected folders are currently active. None are marked [NOT NEEDED].");
+            if does_not_matter.is_empty() {
+                println!("\n⚠️ Caution: All detected folders are connected/needed! None are safe to delete.");
                 return;
             }
 
@@ -228,8 +228,8 @@ fn main() {
             } else {
                 Confirm::new()
                     .with_prompt(format!(
-                        "\nWould you like to safely purge all {} NOT NEEDED folders now?",
-                        not_needed.len()
+                        "\nWould you like to safely purge all {} folders that DO NOT MATTER?",
+                        does_not_matter.len()
                     ))
                     .default(false)
                     .interact()
@@ -237,7 +237,7 @@ fn main() {
             };
 
             if proceed {
-                let result = cleaner::purge_artifacts(&not_needed, false);
+                let result = cleaner::purge_artifacts(&does_not_matter, false);
                 ui::display_clean_summary(&result);
             } else {
                 println!("\nNo files were deleted.");

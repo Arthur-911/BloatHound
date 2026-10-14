@@ -156,3 +156,47 @@ fn test_assess_necessity() {
     assert_eq!(v_old, Verdict::NotNeeded);
     assert!(reason.contains("npm install"));
 }
+
+#[test]
+fn test_integrity_analyzer() {
+    use dev_cleaner::analyzer::analyze_folder_integrity;
+
+    let root = tempdir().unwrap();
+    let project = root.path().join("my_webapp");
+    fs::create_dir(&project).unwrap();
+
+    // 1. Create a project manifest
+    fs::write(project.join("package.json"), "{}").unwrap();
+
+    // 2. Create node_modules
+    let nm = project.join("node_modules");
+    fs::create_dir(&nm).unwrap();
+    fs::write(nm.join("lib.js"), "module.exports = {};").unwrap();
+
+    let info = ArtifactInfo {
+        path: nm.clone(),
+        project_name: "my_webapp".to_string(),
+        category: "Node.js".to_string(),
+        pattern: "node_modules".to_string(),
+        size_bytes: 100,
+        file_count: 1,
+        created_at: None,
+        accessed_at: None,
+        modified_at: None,
+        recreate_cmd: "npm install".to_string(),
+    };
+
+    // Standard recreatable folder -> does not matter if deleted
+    let analysis1 = analyze_folder_integrity(&info);
+    assert!(analysis1.has_manifest);
+    assert!(!analysis1.has_custom_user_files);
+    assert!(!analysis1.is_needed);
+
+    // Now put a custom user file (.env.production) inside the artifact folder
+    fs::write(nm.join(".env.production"), "SECRET=123").unwrap();
+
+    // Now it MATTERS if deleted!
+    let analysis2 = analyze_folder_integrity(&info);
+    assert!(analysis2.has_custom_user_files);
+    assert!(analysis2.is_needed);
+}
