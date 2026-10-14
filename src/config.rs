@@ -168,12 +168,11 @@ pub const PROTECTED_SYSTEM_DIRS: &[&str] = &[
     "programdata",
     "$recycle.bin",
     "system volume information",
-    "appdata",
     "proc",
     "sys",
     "dev",
     "etc",
-    "usr",
-    "var",
     "boot",
+    "sbin",
 ];
+

@@ -200,3 +200,19 @@ fn test_integrity_analyzer() {
     assert!(analysis2.has_custom_user_files);
     assert!(analysis2.is_needed);
 }
+
+#[test]
+fn test_validate_scan_path_ancestor_protection() {
+    use bloathound::scanner::validate_scan_path;
+
+    let root = tempdir().unwrap();
+    let protected_parent = root.path().join("windows");
+    let deep_child = protected_parent.join("system32").join("drivers");
+    fs::create_dir_all(&deep_child).unwrap();
+
+    let result = validate_scan_path(&deep_child);
+    assert!(result.is_err());
+    let err_msg = result.unwrap_err();
+    assert!(err_msg.contains("protected system directory"));
+}
+

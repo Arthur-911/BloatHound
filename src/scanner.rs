@@ -15,30 +15,35 @@ pub fn validate_scan_path(target: &Path) -> Result<PathBuf, String> {
     }
 
     // Safety: check root path
-    if canonical.parent().is_none() {
+    if canonical.parent().is_none()
+        || canonical
+            .components()
+            .filter(|c| matches!(c, std::path::Component::Normal(_)))
+            .count()
+            == 0
+    {
         return Err(format!(
             "Scanning root drive ({}) is blocked for safety. Please choose a specific folder.",
             canonical.display()
         ));
     }
 
-    // Safety: check protected system folders
-    let dir_name_lower = canonical
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("")
-        .to_lowercase();
-
-    if PROTECTED_SYSTEM_DIRS.contains(&dir_name_lower.as_str()) {
-        return Err(format!(
-            "Scanning protected system directory ({}) is blocked for safety.",
-            canonical.display()
-        ));
+    // Safety: check protected system folders across all ancestor components
+    for comp in canonical.components() {
+        if let std::path::Component::Normal(os_str) = comp {
+            let name_lower = os_str.to_string_lossy().to_lowercase();
+            if PROTECTED_SYSTEM_DIRS.contains(&name_lower.as_str()) {
+                return Err(format!(
+                    "Scanning inside protected system directory ({}) is blocked for safety.",
+                    canonical.display()
+                ));
+            }
+        }
     }
 
     let mut s = canonical.to_string_lossy().to_string();
-    if s.starts_with(r"\\?\") {
-        s = s[4..].to_string();
+    if let Some(stripped) = s.strip_prefix(r"\\?\") {
+        s = stripped.to_string();
     }
     let clean = PathBuf::from(s);
 
