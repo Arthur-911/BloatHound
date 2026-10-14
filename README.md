@@ -8,6 +8,12 @@ Unlike standard disk cleaning scripts that delete files indiscriminately, BloatH
 
 ## Installation
 
+### Pre-built Binaries
+
+Download pre-compiled binaries for Windows, Linux, or macOS from the [Releases](https://github.com/Arthur-911/BloatHound/releases) page.
+
+Extract the archive and place `bloathound` (or `bloathound.exe`) in your system's `PATH`.
+
 ### From Source
 
 Ensure you have Rust and Cargo installed:
