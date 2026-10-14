@@ -71,6 +71,9 @@ pub fn analyze_folder_integrity(artifact: &ArtifactInfo) -> IntegrityAnalysis {
     // Check if the user accidentally stored unique personal files inside this folder (.env, .sql, .pem, etc.)
     let mut custom_files = Vec::new();
     for entry in WalkDir::new(artifact_dir).into_iter().filter_map(|e| e.ok()) {
+        if entry.path_is_symlink() {
+            continue;
+        }
         if entry.file_type().is_file() {
             let file_name = entry.file_name().to_string_lossy().to_lowercase();
             let ext = entry

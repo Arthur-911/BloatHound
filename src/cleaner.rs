@@ -23,6 +23,9 @@ pub fn remove_dir_all_resilient(path: &Path) -> std::io::Result<()> {
     if let Err(e) = fs::remove_dir_all(path) {
         // If removal failed, attempt to clear read-only attributes and retry
         for entry in walkdir::WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
+            if entry.path_is_symlink() {
+                continue;
+            }
             if let Ok(metadata) = entry.metadata() {
                 let mut perms = metadata.permissions();
 
@@ -75,6 +78,33 @@ pub fn purge_artifact(info: &ArtifactInfo, dry_run: bool) -> Result<(), String> 
             "Safety block: Directory '{}' is not in the safe disposable list.",
             folder_name
         ));
+    }
+
+    // Safety guard: if the artifact directory itself is a symlink or junction,
+    // safely unlink the link only and never recurse into the target.
+    let symlink_meta = match path.symlink_metadata() {
+        Ok(m) => m,
+        Err(_) => return Ok(()),
+    };
+
+    if symlink_meta.is_symlink() {
+        if dry_run {
+            return Ok(());
+        }
+
+        #[cfg(windows)]
+        {
+            if fs::remove_dir(path).is_err() {
+                let _ = fs::remove_file(path);
+            }
+        }
+
+        #[cfg(unix)]
+        {
+            let _ = fs::remove_file(path);
+        }
+
+        return Ok(());
     }
 
     if dry_run {

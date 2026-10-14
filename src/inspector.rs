@@ -46,6 +46,9 @@ pub fn inspect_artifact(artifact_path: &Path, pattern: &ArtifactPattern) -> Arti
     let mut max_modified = dir_modified;
 
     for entry in WalkDir::new(artifact_path).into_iter().filter_map(|e| e.ok()) {
+        if entry.path_is_symlink() {
+            continue;
+        }
         if entry.file_type().is_file() {
             file_count += 1;
             if let Ok(metadata) = entry.metadata() {
@@ -93,6 +96,9 @@ pub fn list_files_with_timestamps(dir_path: &Path, max_files: usize) -> Vec<File
     let mut files = Vec::new();
 
     for entry in WalkDir::new(dir_path).into_iter().filter_map(|e| e.ok()) {
+        if entry.path_is_symlink() {
+            continue;
+        }
         if entry.file_type().is_file() {
             let path = entry.path().to_path_buf();
             let relative_path = path

@@ -202,6 +202,24 @@ fn test_integrity_analyzer() {
 }
 
 #[test]
+fn test_purge_artifact_nonexistent() {
+    let fake = std::path::PathBuf::from("path_that_does_not_exist_abc987");
+    let info = ArtifactInfo {
+        path: fake,
+        project_name: "test".to_string(),
+        category: "Node.js".to_string(),
+        pattern: "node_modules".to_string(),
+        size_bytes: 0,
+        file_count: 0,
+        created_at: None,
+        accessed_at: None,
+        modified_at: None,
+        recreate_cmd: "npm install".to_string(),
+    };
+    assert!(purge_artifact(&info, false).is_ok());
+}
+
+#[test]
 fn test_validate_scan_path_ancestor_protection() {
     use bloathound::scanner::validate_scan_path;
 
@@ -215,4 +233,6 @@ fn test_validate_scan_path_ancestor_protection() {
     let err_msg = result.unwrap_err();
     assert!(err_msg.contains("protected system directory"));
 }
+
+
 
