@@ -1,13 +1,13 @@
 use clap::{Parser, Subcommand};
-use dev_cleaner::{analyzer, cleaner, explorer, inspector, scanner, ui};
+use bloathound::{analyzer, cleaner, explorer, inspector, scanner, ui};
 use dialoguer::Confirm;
 use std::io::Write;
 use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(
-    name = "dev-cleaner",
-    author = "Developer <dev@example.com>",
+    name = "bloathound",
+    author = "Arthur <https://github.com/Arthur-911>",
     version = "0.1.0",
     about = "Lightning-fast, safety-first developer artifact and cache purger with file lifecycle analytics."
 )]

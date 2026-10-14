@@ -9,7 +9,7 @@ use crate::models::{format_bytes, ArtifactInfo, FileDetail, Verdict};
 
 pub fn print_banner() {
     println!("{}", "===================================================".cyan());
-    println!("{}", "               >> dev-cleaner <<                   ".bold().cyan());
+    println!("{}", "               >> BloatHound <<                    ".bold().cyan());
     println!("{}", "   High-Speed Developer Artifact & Cache Purger    ".dimmed());
     println!("{}", "===================================================".cyan());
 }

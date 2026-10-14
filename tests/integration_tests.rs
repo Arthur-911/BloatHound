@@ -1,9 +1,9 @@
-use dev_cleaner::cleaner::purge_artifact;
-use dev_cleaner::config::get_default_patterns;
-use dev_cleaner::explorer::open_in_file_explorer;
-use dev_cleaner::inspector::{get_path_timestamps, inspect_artifact, list_files_with_timestamps};
-use dev_cleaner::models::{format_bytes, format_time_relative, ArtifactInfo};
-use dev_cleaner::scanner::scan_directory;
+use bloathound::cleaner::purge_artifact;
+use bloathound::config::get_default_patterns;
+use bloathound::explorer::open_in_file_explorer;
+use bloathound::inspector::{get_path_timestamps, inspect_artifact, list_files_with_timestamps};
+use bloathound::models::{format_bytes, format_time_relative, ArtifactInfo};
+use bloathound::scanner::scan_directory;
 use std::fs::{self, File};
 use std::io::Write;
 use tempfile::tempdir;
@@ -126,7 +126,7 @@ fn test_open_in_file_explorer_nonexistent() {
 
 #[test]
 fn test_assess_necessity() {
-    use dev_cleaner::models::Verdict;
+    use bloathound::models::Verdict;
     use chrono::{Duration, Local};
 
     // Active artifact (1 day ago)
@@ -159,7 +159,7 @@ fn test_assess_necessity() {
 
 #[test]
 fn test_integrity_analyzer() {
-    use dev_cleaner::analyzer::analyze_folder_integrity;
+    use bloathound::analyzer::analyze_folder_integrity;
 
     let root = tempdir().unwrap();
     let project = root.path().join("my_webapp");

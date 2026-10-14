@@ -1,56 +1,64 @@
-# 🧹 dev-cleaner (Rust)
+# 🐕 BloatHound
 
-> **A blazing-fast, safety-first developer artifact & cache purger with file lifecycle analytics.**
+> **A blazing-fast, safety-first developer artifact & cache purger with dependency analysis and file lifecycle tracking.**
 
 [![Rust](https://img.shields.io/badge/rust-1.70+-orange.svg)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/Arthur-911/BloatHound)
+[![GitHub stars](https://img.shields.io/github/stars/Arthur-911/BloatHound.svg?style=social)](https://github.com/Arthur-911/BloatHound)
 
-Modern software development fills your drive with gigabytes of recreatable build artifacts: `node_modules` (300MB–1GB+ each), `.venv` virtual environments, Rust `target/` directories (up to 20GB), and Java/Gradle build outputs.
+Modern software development fills your SSD with gigabytes of disposable build artifacts: `node_modules` (300MB–1GB+ each), `.venv` virtual environments, Rust `target/` directories (up to 20GB), and Java/Gradle build outputs.
 
-Written in **Rust**, `dev-cleaner` scans your workspace at native speed, calculates reclaimable space, and gives you total transparency by tracking **when files were made (created)**, **when they were last opened (accessed)**, and **when they were last modified**—so you can safely purge abandoned projects without fear.
+Written in **Rust**, **`BloatHound`** scans your workspace at native speed, calculates reclaimable space, analyzes project manifests (`package.json`, `Cargo.toml`), guards against sensitive custom files (`.env`, `.db`), and tracks file lifecycle timestamps (**When Made**, **Last Opened**, and **Last Modified**) before touching a single byte.
 
 ---
 
-## ⚡ Instant Run (Zero Configuration)
+## ⚡ Quick Start
 
-To scan your workspace immediately without any arguments:
+### Installation
+
+Clone and install globally with Cargo:
 
 ```bash
-cargo run
+git clone https://github.com/Arthur-911/BloatHound.git
+cd BloatHound
+cargo install --path .
 ```
 
-Or on Windows, simply double-click **`scan.bat`**.
+Once installed, **`bloathound`** is available as a global command from any terminal on your computer!
 
 ---
 
-## ✨ Features
+## ✨ Key Features
 
 - ⚡ **Native Rust Speed:** Built with Rust and `walkdir` to scan thousands of directories in milliseconds without freezing.
-- 🔍 **Recursive Pruning:** Discovers disposable artifacts instantly without descending inside 50,000 files in deep `node_modules`.
+- 🔬 **Structural Dependency & Integrity Analysis:**
+  - Verifies if an artifact folder is connected to an active manifest (`package.json`, `Cargo.toml`, `requirements.txt`).
+  - Guards against deleting folders containing sensitive user files (`.env`, `.db`, `.sql`).
+  - Checks if sibling code files actively import or reference the folder.
+  - Clearly reports **`🟢 DOES NOT MATTER (SAFE TO DELETE)`** vs **`🔴 MATTERS (KEEP)`**.
 - 🕒 **File Lifecycle Analytics:**
   - **When Made:** Creation timestamp (`st_birthtime` / `created`).
   - **Last Opened:** Access timestamp (`accessed`).
   - **Last Modified:** Modification write timestamp (`modified`).
-- 🔬 **Deep Inspection Mode:** Inspect individual files within any artifact folder to see largest space hogs and their exact timestamps.
+- 📂 **Instant Explorer Jump:** Automatically displays full paths and lets you jump directly into any folder in Windows File Explorer by typing its row number.
 - 🛡️ **Safety Guardrails:**
   - Built-in `--dry-run` simulation mode.
   - Automatically blocks system root paths (`C:\`, `C:\Windows`, `/usr`, `/etc`).
   - Resilient Windows deletion (clears read-only attributes on locked files).
-- 🎨 **Terminal Dashboard:** Built with UTF-8 border tables, colored status panels, and humanized sizes (`450.2 MB`, `2.4 GB`).
 
 ---
 
 ## 📦 Supported Ecosystems
 
-| Ecosystem | Detected Artifacts |
-| :--- | :--- |
-| **Node.js / JS / TS** | `node_modules`, `.next`, `.nuxt`, `.turbo` |
-| **Python** | `.venv`, `venv`, `__pycache__`, `.pytest_cache` |
-| **Rust** | `target` |
-| **Java / Android** | `.gradle`, `build` |
-| **Bundlers & Web** | `dist`, `out` |
-| **.NET / C#** | `bin`, `obj` |
+| Ecosystem | Detected Artifacts | Recreated With |
+| :--- | :--- | :--- |
+| **Node.js / JS / TS** | `node_modules`, `.next`, `.nuxt`, `.turbo` | `npm install` / `npm run build` |
+| **Python** | `.venv`, `venv`, `__pycache__`, `.pytest_cache` | `pip install -r requirements.txt` |
+| **Rust** | `target` | `cargo build` |
+| **Java / Android** | `.gradle`, `build` | `gradle build` |
+| **Bundlers & Web** | `dist`, `out` | `npm run build` |
+| **.NET / C#** | `bin`, `obj` | `dotnet build` |
 
 ---
 
@@ -59,52 +67,45 @@ Or on Windows, simply double-click **`scan.bat`**.
 ### 1. Instant Scan & Jump to Folder
 Scan the workspace and jump to any folder directly in Windows File Explorer:
 ```bash
-dev-cleaner
-# or
-dev-cleaner scan "C:\path\to\projects"
+bloathound
+# or scan a specific directory
+bloathound scan "C:\path\to\projects"
 ```
 After scanning, simply type the row number (e.g., `1` or `5`) to immediately pop open that folder in File Explorer!
 
-### 2. Intelligent Necessity Audit
-Scan and evaluate whether folders are needed or safe to delete based on activity recency:
+### 2. Structural Dependency & Necessity Analysis
+Analyze whether folders are connected to project files and if deleting them matters:
 ```bash
-dev-cleaner audit
+bloathound analyze
 # or
-dev-cleaner check "C:\path\to\projects"
+bloathound check "C:\path\to\projects"
 ```
 Categorizes all folders into:
-- 🔴 **NOT NEEDED (Safe to Delete):** Untouched for > 30 days. Tells you how to recreate it anytime.
-- 🟡 **REVIEW:** Inactive for 14–30 days.
-- 🟢 **KEEP / ACTIVE:** Active within 14 days. Avoids re-downloading packages for active projects.
+- 🟢 **DOES NOT MATTER (SAFE TO DELETE):** Recreatable cache connected to a manifest with 0 custom files.
+- 🔴 **MATTERS (KEEP):** Contains sensitive user files (`.env`, `.db`) or is directly imported by project code.
 
-### 3. Direct Open Command
-Open any project folder on your PC directly:
+### 3. Direct Jump to Any Folder
+Open any project folder on your PC directly in File Explorer:
 ```bash
-dev-cleaner open "C:\path\to\project\target"
+bloathound open "C:\path\to\project\target"
 ```
 
 ### 4. Detailed File Breakdown
 View individual files inside the detected artifacts with their creation, access, and modified dates:
 ```bash
-dev-cleaner scan . --detailed
+bloathound scan . --detailed
 ```
 
 ### 5. Deep-Inspect a Specific Artifact Folder
 See a sorted list of the largest files inside an artifact folder:
 ```bash
-dev-cleaner inspect "path/to/project/node_modules" --limit 20
+bloathound inspect "path/to/project/node_modules" --limit 20
 ```
 
-### 5. Safe Simulation (Dry-Run Mode)
+### 6. Safe Simulation (Dry-Run Mode)
 Preview what would be deleted without touching any files on disk:
 ```bash
-dev-cleaner clean . --dry-run
-```
-
-### 5. Live Cleaning
-Prompts for confirmation before safely purging selected artifact directories:
-```bash
-cargo run -- clean .
+bloathound clean . --dry-run
 ```
 
 ---
@@ -119,18 +120,8 @@ cargo test
 
 ---
 
-## 📦 Standalone Binary Compilation
-
-To compile a single, zero-dependency `.exe` binary that you can copy to your desktop or PATH:
-
-```bash
-cargo build --release
-```
-The compiled executable is ready at:  
-`target/release/dev-cleaner.exe`
-
----
-
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+Developed with ❤️ by [Arthur](https://github.com/Arthur-911).

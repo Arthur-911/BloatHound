@@ -1,11 +1,12 @@
 [package]
-name = "dev-cleaner"
+name = "bloathound"
 version = "0.1.0"
 edition = "2021"
-authors = ["Developer <dev@example.com>"]
-description = "A fast, safety-first developer artifact and cache purger with file lifecycle analytics."
+authors = ["Arthur <https://github.com/Arthur-911>"]
+description = "A blazing-fast, safety-first developer artifact and cache purger with file lifecycle analytics and integrity verification."
+repository = "https://github.com/Arthur-911/BloatHound"
 license = "MIT"
-keywords = ["cli", "cleaner", "cache", "disk-space", "node_modules"]
+keywords = ["cli", "cleaner", "cache", "disk-space", "developer-tools"]
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }

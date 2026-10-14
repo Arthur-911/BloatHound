@@ -1,5 +1,5 @@
 @echo off
-title dev-cleaner - Fast Developer Artifact and Cache Purger
+title BloatHound - Fast Developer Artifact and Cache Purger
 cd /d "%~dp0"
 
 echo ===================================================
