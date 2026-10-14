@@ -40,7 +40,7 @@ const SOURCE_EXTENSIONS: &[&str] = &[
 ];
 
 const SENSITIVE_USER_EXTENSIONS: &[&str] = &[
-    "env", "sql", "sqlite", "db", "pem", "key", "cert", "secret", "draft",
+    "env", "sql", "sqlite", "db", "pem", "key", "cert", "secret", "draft", "kdbx", "ovpn",
 ];
 
 pub fn analyze_folder_integrity(artifact: &ArtifactInfo) -> IntegrityAnalysis {
@@ -83,8 +83,13 @@ pub fn analyze_folder_integrity(artifact: &ArtifactInfo) -> IntegrityAnalysis {
                 .unwrap_or("")
                 .to_lowercase();
 
-            // Check for explicit user environment configs or sensitive non-build files
-            let is_user_env = file_name == ".env" || file_name.starts_with(".env.");
+            // Check for explicit user environment configs, ssh keys, or sensitive non-build files
+            let is_user_env = file_name == ".env"
+                || file_name.starts_with(".env.")
+                || file_name == ".envrc"
+                || file_name == "credentials.json"
+                || file_name == "id_rsa"
+                || file_name == "id_ed25519";
             let is_user_sensitive = ext != "pdb" && SENSITIVE_USER_EXTENSIONS.contains(&ext.as_str());
 
             if is_user_env || is_user_sensitive {
@@ -117,6 +122,12 @@ pub fn analyze_folder_integrity(artifact: &ArtifactInfo) -> IntegrityAnalysis {
             if path.is_file() {
                 let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
                 if SOURCE_EXTENSIONS.contains(&ext) && !path.ends_with("Cargo.lock") {
+                    // Safety guard: cap file size to 2 MB to avoid memory exhaustion on large bundles
+                    let file_size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+                    if file_size > 2 * 1024 * 1024 {
+                        continue;
+                    }
+
                     if let Ok(content) = fs::read_to_string(path) {
                         // Look for explicit runtime import or require statements
                         let import_pattern_a = format!("require(\"./{}\"", folder_name);
