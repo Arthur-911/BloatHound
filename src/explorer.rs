@@ -8,8 +8,8 @@ pub fn open_in_file_explorer(path: &Path) -> Result<(), String> {
     }
 
     let path_str = path.to_string_lossy();
-    let target = if path_str.starts_with(r"\\?\") {
-        &path_str[4..]
+    let target = if let Some(stripped) = path_str.strip_prefix(r"\\?\") {
+        stripped
     } else {
         &path_str
     };
@@ -33,6 +33,7 @@ pub fn open_in_file_explorer(path: &Path) -> Result<(), String> {
     #[cfg(target_os = "linux")]
     {
         std::process::Command::new("xdg-open")
+            .arg("--")
             .arg(path)
             .spawn()
             .map_err(|e| format!("Failed to open file manager: {}", e))?;

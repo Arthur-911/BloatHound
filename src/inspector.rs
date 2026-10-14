@@ -6,32 +6,21 @@ use walkdir::WalkDir;
 use crate::config::ArtifactPattern;
 use crate::models::{ArtifactInfo, FileDetail};
 
-pub fn get_path_timestamps(
-    path: &Path,
-) -> (
+pub type PathTimestamps = (
     Option<DateTime<Local>>,
     Option<DateTime<Local>>,
     Option<DateTime<Local>>,
-) {
+);
+
+pub fn get_path_timestamps(path: &Path) -> PathTimestamps {
     let metadata = match fs::metadata(path) {
         Ok(m) => m,
         Err(_) => return (None, None, None),
     };
 
-    let created: Option<DateTime<Local>> = metadata
-        .created()
-        .ok()
-        .map(|t| DateTime::<Local>::from(t));
-
-    let accessed: Option<DateTime<Local>> = metadata
-        .accessed()
-        .ok()
-        .map(|t| DateTime::<Local>::from(t));
-
-    let modified: Option<DateTime<Local>> = metadata
-        .modified()
-        .ok()
-        .map(|t| DateTime::<Local>::from(t));
+    let created: Option<DateTime<Local>> = metadata.created().ok().map(DateTime::<Local>::from);
+    let accessed: Option<DateTime<Local>> = metadata.accessed().ok().map(DateTime::<Local>::from);
+    let modified: Option<DateTime<Local>> = metadata.modified().ok().map(DateTime::<Local>::from);
 
     (created, accessed, modified)
 }
@@ -56,14 +45,14 @@ pub fn inspect_artifact(artifact_path: &Path, pattern: &ArtifactPattern) -> Arti
 
                 if let Ok(acc) = metadata.accessed() {
                     let acc_dt: DateTime<Local> = acc.into();
-                    if max_accessed.map_or(true, |cur| acc_dt > cur) {
+                    if max_accessed.is_none_or(|cur| acc_dt > cur) {
                         max_accessed = Some(acc_dt);
                     }
                 }
 
                 if let Ok(mod_time) = metadata.modified() {
                     let mod_dt: DateTime<Local> = mod_time.into();
-                    if max_modified.map_or(true, |cur| mod_dt > cur) {
+                    if max_modified.is_none_or(|cur| mod_dt > cur) {
                         max_modified = Some(mod_dt);
                     }
                 }
@@ -121,7 +110,7 @@ pub fn list_files_with_timestamps(dir_path: &Path, max_files: usize) -> Vec<File
     }
 
     // Sort by largest file size first
-    files.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+    files.sort_by_key(|a| std::cmp::Reverse(a.size_bytes));
 
     if files.len() > max_files {
         files.truncate(max_files);
