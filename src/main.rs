@@ -1,6 +1,7 @@
-use dev_cleaner::{cleaner, inspector, scanner, ui};
 use clap::{Parser, Subcommand};
+use dev_cleaner::{cleaner, explorer, inspector, scanner, ui};
 use dialoguer::Confirm;
+use std::io::Write;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -30,6 +31,10 @@ enum Commands {
         /// Maximum files to display per artifact in detailed view
         #[arg(long, default_value = "15")]
         max_files: usize,
+
+        /// Automatically open the Nth artifact folder in File Explorer
+        #[arg(short, long)]
+        open: Option<usize>,
     },
 
     /// Deep-inspect a specific folder to view files with timestamps
@@ -40,6 +45,12 @@ enum Commands {
         /// Maximum number of files to show
         #[arg(long, default_value = "25")]
         limit: usize,
+    },
+
+    /// Open a specific folder directly in Windows File Explorer
+    Open {
+        /// Folder path to open
+        path: PathBuf,
     },
 
     /// Purge disposable artifact directories to reclaim disk space
@@ -68,6 +79,7 @@ fn main() {
         path: PathBuf::from("."),
         detailed: false,
         max_files: 15,
+        open: None,
     });
 
     match command {
@@ -75,6 +87,7 @@ fn main() {
             path,
             detailed,
             max_files,
+            open,
         } => {
             println!("\nScanning workspace: {}", path.display());
 
@@ -87,6 +100,44 @@ fn main() {
                             let files = inspector::list_files_with_timestamps(&art.path, max_files);
                             let title = format!("{} -> {}", art.project_name, art.pattern);
                             ui::display_files_table(&files, &title);
+                        }
+                    }
+
+                    if !artifacts.is_empty() {
+                        if let Some(target_idx) = open {
+                            if target_idx >= 1 && target_idx <= artifacts.len() {
+                                let target_path = &artifacts[target_idx - 1].path;
+                                println!("\nOpening in File Explorer: {}", target_path.display());
+                                if let Err(e) = explorer::open_in_file_explorer(target_path) {
+                                    eprintln!("Error opening folder: {}", e);
+                                }
+                            } else {
+                                eprintln!(
+                                    "\nInvalid folder number {}. Please choose between 1 and {}.",
+                                    target_idx,
+                                    artifacts.len()
+                                );
+                            }
+                        } else {
+                            // Interactive jump prompt
+                            print!(
+                                "\n📂 Enter folder # to open directly in File Explorer [1-{}] (or press Enter to skip): ",
+                                artifacts.len()
+                            );
+                            let _ = std::io::stdout().flush();
+                            let mut input = String::new();
+                            if std::io::stdin().read_line(&mut input).is_ok() {
+                                let trimmed = input.trim();
+                                if let Ok(idx) = trimmed.parse::<usize>() {
+                                    if idx >= 1 && idx <= artifacts.len() {
+                                        let target_path = &artifacts[idx - 1].path;
+                                        println!("Opening in File Explorer: {}", target_path.display());
+                                        if let Err(e) = explorer::open_in_file_explorer(target_path) {
+                                            eprintln!("Error opening folder: {}", e);
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -110,6 +161,26 @@ fn main() {
                 .and_then(|n| n.to_str())
                 .unwrap_or("target");
             ui::display_files_table(&files, folder_name);
+
+            let confirmed = Confirm::new()
+                .with_prompt("\nOpen this folder in File Explorer?")
+                .default(false)
+                .interact()
+                .unwrap_or(false);
+
+            if confirmed {
+                if let Err(e) = explorer::open_in_file_explorer(&path) {
+                    eprintln!("Error: {}", e);
+                }
+            }
+        }
+
+        Commands::Open { path } => {
+            println!("\nOpening in File Explorer: {}", path.display());
+            if let Err(e) = explorer::open_in_file_explorer(&path) {
+                eprintln!("\nError: {}", e);
+                std::process::exit(1);
+            }
         }
 
         Commands::Clean { path, dry_run, yes } => {

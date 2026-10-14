@@ -34,6 +34,7 @@ pub fn display_artifacts_table(artifacts: &[ArtifactInfo]) {
         Cell::new("When Made (Created)").fg(Color::Blue),
         Cell::new("Last Opened (Accessed)").fg(Color::Yellow),
         Cell::new("Last Modified").fg(Color::White),
+        Cell::new("Exact Folder Path").fg(Color::Magenta),
     ]);
 
     let mut total_bytes: u64 = 0;
@@ -49,6 +50,7 @@ pub fn display_artifacts_table(artifacts: &[ArtifactInfo]) {
             Cell::new(item.created_str()).fg(Color::Blue),
             Cell::new(item.accessed_str()).fg(Color::Yellow),
             Cell::new(item.modified_str()),
+            Cell::new(item.path.display().to_string()).fg(Color::DarkGrey),
         ]);
     }
 

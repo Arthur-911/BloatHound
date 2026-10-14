@@ -1,5 +1,6 @@
 use dev_cleaner::cleaner::purge_artifact;
 use dev_cleaner::config::get_default_patterns;
+use dev_cleaner::explorer::open_in_file_explorer;
 use dev_cleaner::inspector::{get_path_timestamps, inspect_artifact, list_files_with_timestamps};
 use dev_cleaner::models::{format_bytes, format_time_relative, ArtifactInfo};
 use dev_cleaner::scanner::scan_directory;
@@ -113,4 +114,11 @@ fn test_cleaner_safety_block_on_arbitrary_folder() {
     let result = purge_artifact(&info, false);
     assert!(result.is_err());
     assert!(dangerous_dir.exists(), "User code must remain untouched");
+}
+
+#[test]
+fn test_open_in_file_explorer_nonexistent() {
+    let fake_path = std::path::Path::new("C:\\fake_path_that_does_not_exist_xyz123");
+    let res = open_in_file_explorer(fake_path);
+    assert!(res.is_err());
 }

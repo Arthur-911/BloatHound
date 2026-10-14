@@ -36,7 +36,13 @@ pub fn validate_scan_path(target: &Path) -> Result<PathBuf, String> {
         ));
     }
 
-    Ok(canonical)
+    let mut s = canonical.to_string_lossy().to_string();
+    if s.starts_with(r"\\?\") {
+        s = s[4..].to_string();
+    }
+    let clean = PathBuf::from(s);
+
+    Ok(clean)
 }
 
 pub fn scan_directory(root: &Path, max_depth: usize) -> Result<Vec<ArtifactInfo>, String> {

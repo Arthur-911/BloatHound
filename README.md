@@ -56,30 +56,37 @@ Or on Windows, simply double-click **`scan.bat`**.
 
 ## 🛠️ Usage & Commands
 
-### 1. Instant Scan
-Scan the current directory:
+### 1. Instant Scan & Jump to Folder
+Scan the workspace and jump to any folder directly in Windows File Explorer:
 ```bash
-cargo run
+dev-cleaner
 # or
-cargo run -- scan .
+dev-cleaner scan "C:\path\to\projects"
+```
+After scanning, simply type the row number (e.g., `1` or `5`) to immediately pop open that folder in File Explorer!
+
+### 2. Direct Open Command
+Open any project folder on your PC directly:
+```bash
+dev-cleaner open "C:\path\to\project\target"
 ```
 
-### 2. Detailed File Breakdown
+### 3. Detailed File Breakdown
 View individual files inside the detected artifacts with their creation, access, and modified dates:
 ```bash
-cargo run -- scan . --detailed
+dev-cleaner scan . --detailed
 ```
 
-### 3. Deep-Inspect a Specific Artifact Folder
+### 4. Deep-Inspect a Specific Artifact Folder
 See a sorted list of the largest files inside an artifact folder:
 ```bash
-cargo run -- inspect "path/to/project/node_modules" --limit 20
+dev-cleaner inspect "path/to/project/node_modules" --limit 20
 ```
 
-### 4. Safe Simulation (Dry-Run Mode)
+### 5. Safe Simulation (Dry-Run Mode)
 Preview what would be deleted without touching any files on disk:
 ```bash
-cargo run -- clean . --dry-run
+dev-cleaner clean . --dry-run
 ```
 
 ### 5. Live Cleaning
