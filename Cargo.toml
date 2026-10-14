@@ -1,0 +1,20 @@
+[package]
+name = "dev-cleaner"
+version = "0.1.0"
+edition = "2021"
+authors = ["Developer <dev@example.com>"]
+description = "A fast, safety-first developer artifact and cache purger with file lifecycle analytics."
+license = "MIT"
+keywords = ["cli", "cleaner", "cache", "disk-space", "node_modules"]
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+walkdir = "2.5"
+comfy-table = "7.1"
+chrono = "0.4"
+colored = "2.1"
+indicatif = "0.17"
+dialoguer = "0.11"
+
+[dev-dependencies]
+tempfile = "3.10"

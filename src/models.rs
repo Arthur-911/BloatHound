@@ -1,0 +1,104 @@
+use chrono::{DateTime, Local};
+use std::path::PathBuf;
+
+#[derive(Debug, Clone)]
+pub struct ArtifactInfo {
+    pub path: PathBuf,
+    pub project_name: String,
+    pub category: String,
+    pub pattern: String,
+    pub size_bytes: u64,
+    pub file_count: usize,
+    pub created_at: Option<DateTime<Local>>,
+    pub accessed_at: Option<DateTime<Local>>,
+    pub modified_at: Option<DateTime<Local>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct FileDetail {
+    pub path: PathBuf,
+    pub relative_path: String,
+    pub size_bytes: u64,
+    pub created_at: Option<DateTime<Local>>,
+    pub accessed_at: Option<DateTime<Local>>,
+    pub modified_at: Option<DateTime<Local>>,
+}
+
+pub fn format_bytes(bytes: u64) -> String {
+    let mut b = bytes as f64;
+    for unit in ["B", "KB", "MB", "GB", "TB"] {
+        if b < 1024.0 || unit == "TB" {
+            if unit == "B" || unit == "KB" {
+                return format!("{} {}", b as u64, unit);
+            }
+            return format!("{:.1} {}", b, unit);
+        }
+        b /= 1024.0;
+    }
+    format!("{} B", bytes)
+}
+
+pub fn format_time_relative(dt_opt: Option<DateTime<Local>>) -> String {
+    let dt = match dt_opt {
+        Some(t) => t,
+        None => return "Unknown".to_string(),
+    };
+
+    let now = Local::now();
+    let diff = now.signed_duration_since(dt);
+    let seconds = diff.num_seconds();
+
+    let rel = if seconds < 0 {
+        "just now".to_string()
+    } else if seconds < 60 {
+        format!("{}s ago", seconds)
+    } else if seconds < 3600 {
+        format!("{}m ago", seconds / 60)
+    } else if seconds < 86400 {
+        format!("{}h ago", seconds / 3600)
+    } else if seconds < 86400 * 30 {
+        format!("{}d ago", seconds / 86400)
+    } else if seconds < 86400 * 365 {
+        format!("{}mo ago", seconds / (86400 * 30))
+    } else {
+        format!("{}y ago", seconds / (86400 * 365))
+    };
+
+    format!("{} ({})", dt.format("%Y-%m-%d %H:%M"), rel)
+}
+
+impl ArtifactInfo {
+    pub fn human_size(&self) -> String {
+        format_bytes(self.size_bytes)
+    }
+
+    pub fn created_str(&self) -> String {
+        format_time_relative(self.created_at)
+    }
+
+    pub fn accessed_str(&self) -> String {
+        format_time_relative(self.accessed_at)
+    }
+
+    pub fn modified_str(&self) -> String {
+        format_time_relative(self.modified_at)
+    }
+}
+
+impl FileDetail {
+    pub fn human_size(&self) -> String {
+        format_bytes(self.size_bytes)
+    }
+
+    pub fn created_str(&self) -> String {
+        format_time_relative(self.created_at)
+    }
+
+    pub fn accessed_str(&self) -> String {
+        format_time_relative(self.accessed_at)
+    }
+
+    pub fn modified_str(&self) -> String {
+        format_time_relative(self.modified_at)
+    }
+}
