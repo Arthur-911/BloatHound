@@ -21,13 +21,28 @@ impl CleanResult {
 
 pub fn remove_dir_all_resilient(path: &Path) -> std::io::Result<()> {
     if let Err(e) = fs::remove_dir_all(path) {
-        // If removal failed, attempt to clear read-only attributes on Windows and retry
+        // If removal failed, attempt to clear read-only attributes and retry
         for entry in walkdir::WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
             if let Ok(metadata) = entry.metadata() {
                 let mut perms = metadata.permissions();
-                if perms.readonly() {
-                    perms.set_readonly(false);
-                    let _ = fs::set_permissions(entry.path(), perms);
+
+                #[cfg(windows)]
+                {
+                    if perms.readonly() {
+                        #[allow(clippy::permissions_set_readonly_false)]
+                        perms.set_readonly(false);
+                        let _ = fs::set_permissions(entry.path(), perms);
+                    }
+                }
+
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    let mode = perms.mode();
+                    if mode & 0o200 == 0 {
+                        perms.set_mode(mode | 0o200);
+                        let _ = fs::set_permissions(entry.path(), perms);
+                    }
                 }
             }
         }
