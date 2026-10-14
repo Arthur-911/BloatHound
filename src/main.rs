@@ -133,7 +133,7 @@ fn main() {
                         } else {
                             // Interactive jump prompt
                             print!(
-                                "\n📂 Enter folder # to open directly in File Explorer [1-{}] (or press Enter to skip): ",
+                                "\nEnter folder # to open directly in File Explorer [1-{}] (or press Enter to skip): ",
                                 artifacts.len()
                             );
                             let _ = std::io::stdout().flush();
@@ -219,7 +219,7 @@ fn main() {
                 .collect();
 
             if does_not_matter.is_empty() {
-                println!("\n⚠️ Caution: All detected folders are connected/needed! None are safe to delete.");
+                println!("\nCaution: All detected folders are connected/needed. None are safe to delete.");
                 return;
             }
 

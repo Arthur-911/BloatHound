@@ -1,23 +1,16 @@
-# 🐕 BloatHound
+# BloatHound
 
-> **A blazing-fast, safety-first developer artifact & cache purger with dependency analysis and file lifecycle tracking.**
+A command-line tool written in Rust to audit, inspect, and safely remove disposable build artifacts and caches across developer workspaces.
 
-[![Rust](https://img.shields.io/badge/rust-1.70+-orange.svg)](https://www.rust-lang.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/Arthur-911/BloatHound)
-[![GitHub stars](https://img.shields.io/github/stars/Arthur-911/BloatHound.svg?style=social)](https://github.com/Arthur-911/BloatHound)
-
-Modern software development fills your SSD with gigabytes of disposable build artifacts: `node_modules` (300MB–1GB+ each), `.venv` virtual environments, Rust `target/` directories (up to 20GB), and Java/Gradle build outputs.
-
-Written in **Rust**, **`BloatHound`** scans your workspace at native speed, calculates reclaimable space, analyzes project manifests (`package.json`, `Cargo.toml`), guards against sensitive custom files (`.env`, `.db`), and tracks file lifecycle timestamps (**When Made**, **Last Opened**, and **Last Modified**) before touching a single byte.
+Unlike standard disk cleaning scripts that delete files indiscriminately, BloatHound inspects project structure, manifest files (`package.json`, `Cargo.toml`, `requirements.txt`), and file modification timestamps to distinguish between harmless build artifacts and active user data.
 
 ---
 
-## ⚡ Quick Start
+## Installation
 
-### Installation
+### From Source
 
-Clone and install globally with Cargo:
+Ensure you have Rust and Cargo installed:
 
 ```bash
 git clone https://github.com/Arthur-911/BloatHound.git
@@ -25,94 +18,114 @@ cd BloatHound
 cargo install --path .
 ```
 
-Once installed, **`bloathound`** is available as a global command from any terminal on your computer!
+The `bloathound` binary will be installed to your Cargo bin directory and available globally in your path.
 
 ---
 
-## ✨ Key Features
+## Features
 
-- ⚡ **Native Rust Speed:** Built with Rust and `walkdir` to scan thousands of directories in milliseconds without freezing.
-- 🔬 **Structural Dependency & Integrity Analysis:**
-  - Verifies if an artifact folder is connected to an active manifest (`package.json`, `Cargo.toml`, `requirements.txt`).
-  - Guards against deleting folders containing sensitive user files (`.env`, `.db`, `.sql`).
-  - Checks if sibling code files actively import or reference the folder.
-  - Clearly reports **`🟢 DOES NOT MATTER (SAFE TO DELETE)`** vs **`🔴 MATTERS (KEEP)`**.
-- 🕒 **File Lifecycle Analytics:**
-  - **When Made:** Creation timestamp (`st_birthtime` / `created`).
-  - **Last Opened:** Access timestamp (`accessed`).
-  - **Last Modified:** Modification write timestamp (`modified`).
-- 📂 **Instant Explorer Jump:** Automatically displays full paths and lets you jump directly into any folder in Windows File Explorer by typing its row number.
-- 🛡️ **Safety Guardrails:**
-  - Built-in `--dry-run` simulation mode.
-  - Automatically blocks system root paths (`C:\`, `C:\Windows`, `/usr`, `/etc`).
-  - Resilient Windows deletion (clears read-only attributes on locked files).
+- **Fast Directory Traversal:** Uses multi-threaded directory walking with recursive pruning, skipping the internal contents of detected artifact folders to scan entire drives in seconds.
+- **Structural Dependency Analysis:** Checks whether an artifact directory is connected to a recognized build manifest, or if it is an orphaned directory left behind from deleted projects.
+- **Safety Guards for User Files:** Inspects folders for untracked user files (`.env`, configuration files, databases) and aborts deletion if custom files are detected.
+- **Source Code Reference Checking:** Scans project source files to verify whether code directly imports from output folders before classifying them as disposable.
+- **Lifecycle Analytics:** Extracts true file creation, access, and modification timestamps directly from the filesystem.
+- **System Protection:** Hardcoded blocklists prevent scanning or modifying operating system roots, system directories, or `.git` repositories.
+- **Interactive Directory Opening:** Direct integration with the system file manager (Windows File Explorer, macOS Finder, or Linux file managers) to inspect folders before taking action.
 
 ---
 
-## 📦 Supported Ecosystems
+## Supported Ecosystems
 
-| Ecosystem | Detected Artifacts | Recreated With |
+| Ecosystem | Detected Targets | Regeneration Command |
 | :--- | :--- | :--- |
-| **Node.js / JS / TS** | `node_modules`, `.next`, `.nuxt`, `.turbo` | `npm install` / `npm run build` |
-| **Python** | `.venv`, `venv`, `__pycache__`, `.pytest_cache` | `pip install -r requirements.txt` |
-| **Rust** | `target` | `cargo build` |
-| **Java / Android** | `.gradle`, `build` | `gradle build` |
-| **Bundlers & Web** | `dist`, `out` | `npm run build` |
-| **.NET / C#** | `bin`, `obj` | `dotnet build` |
+| Node.js / Web | `node_modules`, `.next`, `.nuxt`, `.turbo` | `npm install` / `npm run build` |
+| Python | `.venv`, `venv`, `__pycache__`, `.pytest_cache` | `pip install -r requirements.txt` |
+| Rust | `target` | `cargo build` |
+| Java / Gradle | `.gradle`, `build` | `gradle build` |
+| Bundlers | `dist`, `out` | `npm run build` |
+| .NET / C# | `bin`, `obj` | `dotnet build` |
 
 ---
 
-## 🛠️ Usage & Commands
+## Usage
 
-### 1. Instant Scan & Jump to Folder
-Scan the workspace and jump to any folder directly in Windows File Explorer:
+### 1. Instant Scan
+
+Scan the current directory:
+
 ```bash
 bloathound
-# or scan a specific directory
+```
+
+Scan a specific workspace or drive:
+
+```bash
 bloathound scan "C:\path\to\projects"
 ```
-After scanning, simply type the row number (e.g., `1` or `5`) to immediately pop open that folder in File Explorer!
 
-### 2. Structural Dependency & Necessity Analysis
-Analyze whether folders are connected to project files and if deleting them matters:
+After scanning, the tool displays an overview table with sizes and timestamps, followed by an optional prompt to open any detected folder directly in your system file manager.
+
+### 2. Dependency and Integrity Analysis
+
+Analyze whether detected folders are linked to project manifests and if deleting them would impact the project:
+
 ```bash
 bloathound analyze
-# or
-bloathound check "C:\path\to\projects"
 ```
-Categorizes all folders into:
-- 🟢 **DOES NOT MATTER (SAFE TO DELETE):** Recreatable cache connected to a manifest with 0 custom files.
-- 🔴 **MATTERS (KEEP):** Contains sensitive user files (`.env`, `.db`) or is directly imported by project code.
 
-### 3. Direct Jump to Any Folder
-Open any project folder on your PC directly in File Explorer:
+Scan and analyze an external folder:
+
+```bash
+bloathound analyze "C:\path\to\projects"
+```
+
+The analysis checks:
+- Manifest Link: Whether a valid manifest exists to regenerate the folder.
+- Custom Files: Whether sensitive non-compiler files (`.env`, `.db`) are present.
+- Source Imports: Whether sibling source code hard-references the directory.
+- Verdict: Classifies each target as `[SAFE TO DELETE]` or `[MATTERS - KEEP]`.
+
+### 3. Direct Folder Navigation
+
+Open a project folder directly in File Explorer:
+
 ```bash
 bloathound open "C:\path\to\project\target"
 ```
 
-### 4. Detailed File Breakdown
-View individual files inside the detected artifacts with their creation, access, and modified dates:
+### 4. File-Level Timestamp Inspection
+
+View the individual files inside detected directories with their creation and modification dates:
+
 ```bash
 bloathound scan . --detailed
 ```
 
-### 5. Deep-Inspect a Specific Artifact Folder
-See a sorted list of the largest files inside an artifact folder:
+Inspect a specific directory's largest files:
+
 ```bash
-bloathound inspect "path/to/project/node_modules" --limit 20
+bloathound inspect "path/to/node_modules" --limit 20
 ```
 
-### 6. Safe Simulation (Dry-Run Mode)
-Preview what would be deleted without touching any files on disk:
+### 5. Safe Cleanup (Dry-Run and Live)
+
+Preview what would be deleted without touching files:
+
 ```bash
 bloathound clean . --dry-run
 ```
 
+Execute an interactive cleanup with confirmation prompts:
+
+```bash
+bloathound clean .
+```
+
 ---
 
-## 🧪 Running Tests
+## Testing
 
-Verify the codebase with the automated integration test suite:
+Run the integration test suite:
 
 ```bash
 cargo test
@@ -120,8 +133,8 @@ cargo test
 
 ---
 
-## 📄 License
+## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
-Developed with ❤️ by [Arthur](https://github.com/Arthur-911).
+Maintained by [Arthur](https://github.com/Arthur-911).

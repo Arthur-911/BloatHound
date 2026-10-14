@@ -45,9 +45,9 @@ pub fn display_artifacts_table(artifacts: &[ArtifactInfo]) {
 
         let (verdict, _) = item.assess_necessity();
         let (status_text, status_color) = match verdict {
-            Verdict::NotNeeded => ("🔴 NOT NEEDED", Color::Red),
-            Verdict::Review => ("🟡 REVIEW", Color::Yellow),
-            Verdict::KeepActive => ("🟢 KEEP (ACTIVE)", Color::Green),
+            Verdict::NotNeeded => ("[DISPOSABLE]", Color::Red),
+            Verdict::Review => ("[REVIEW]", Color::Yellow),
+            Verdict::KeepActive => ("[ACTIVE]", Color::Green),
         };
 
         table.add_row(vec![
@@ -99,7 +99,7 @@ pub fn display_audit_report(artifacts: &[ArtifactInfo]) {
     println!(
         "\n{}",
         format!(
-            "🔴 NOT NEEDED - SAFE TO DELETE ({} folders, {} reclaimable):",
+            "DISPOSABLE - INACTIVE ({} folders, {} reclaimable):",
             not_needed.len(),
             format_bytes(not_needed_bytes)
         )
@@ -127,14 +127,14 @@ pub fn display_audit_report(artifacts: &[ArtifactInfo]) {
     if !review.is_empty() {
         println!(
             "\n{}",
-            format!("🟡 REVIEW - MODERATE INACTIVITY ({} folders):", review.len())
+            format!("REVIEW - MODERATE INACTIVITY ({} folders):", review.len())
                 .bold()
                 .yellow()
         );
         for item in &review {
             let (_, reason) = item.assess_necessity();
             println!(
-                "  • {} ({}) - {}",
+                "  - {} ({}) - {}",
                 item.project_name.bold().white(),
                 item.human_size().bold().green(),
                 reason.dimmed()
@@ -146,14 +146,14 @@ pub fn display_audit_report(artifacts: &[ArtifactInfo]) {
     if !keep.is_empty() {
         println!(
             "\n{}",
-            format!("🟢 KEEP - IN ACTIVE USE ({} folders):", keep.len())
+            format!("KEEP - IN ACTIVE USE ({} folders):", keep.len())
                 .bold()
                 .green()
         );
         for item in &keep {
             let (_, reason) = item.assess_necessity();
             println!(
-                "  • {} ({}) - {}",
+                "  - {} ({}) - {}",
                 item.project_name.bold().white(),
                 item.human_size().bold().green(),
                 reason.dimmed()
@@ -224,9 +224,9 @@ pub fn display_integrity_analysis_table(artifacts: &[ArtifactInfo]) {
         let source_refs_color = if analysis.is_referenced_in_source { Color::Yellow } else { Color::Green };
 
         let (verdict_text, verdict_color) = if analysis.is_needed {
-            ("🔴 MATTERS (KEEP)", Color::Red)
+            ("[MATTERS - KEEP]", Color::Red)
         } else {
-            ("🟢 DOES NOT MATTER (SAFE)", Color::Green)
+            ("[SAFE TO DELETE]", Color::Green)
         };
 
         let label = format!("{} ({})", item.project_name, item.pattern);
