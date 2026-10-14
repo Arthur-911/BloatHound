@@ -234,5 +234,13 @@ fn test_validate_scan_path_ancestor_protection() {
     assert!(err_msg.contains("protected system directory"));
 }
 
+#[test]
+fn test_interactive_navigator_empty_artifacts() {
+    use bloathound::tui::run_interactive_navigator;
+    let res = run_interactive_navigator(&[]);
+    assert!(res.is_none());
+}
+
+
 
 

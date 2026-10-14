@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use bloathound::{analyzer, cleaner, explorer, inspector, scanner, ui};
+use bloathound::{analyzer, cleaner, explorer, inspector, models::format_bytes, scanner, tui, ui};
 use dialoguer::Confirm;
 use std::io::Write;
 use std::path::PathBuf;
@@ -35,6 +35,18 @@ enum Commands {
         /// Automatically open the Nth artifact folder in File Explorer
         #[arg(short, long)]
         open: Option<usize>,
+
+        /// Launch interactive TUI navigator (arrow keys, space to select, 'o' to open)
+        #[arg(short, long)]
+        interactive: bool,
+    },
+
+    /// Launch interactive keyboard navigator (arrow keys, space, 'o' to open)
+    #[command(alias = "nav", alias = "tui")]
+    Interactive {
+        /// Target directory to scan (defaults to current folder)
+        #[arg(default_value = ".")]
+        path: PathBuf,
     },
 
     /// Deep-inspect a specific folder to view files with timestamps
@@ -78,6 +90,10 @@ enum Commands {
         /// Skip confirmation prompt
         #[arg(short, long)]
         yes: bool,
+
+        /// Launch interactive TUI selector to pick targets with checkboxes
+        #[arg(short, long)]
+        interactive: bool,
     },
 }
 
@@ -92,6 +108,7 @@ fn main() {
         detailed: false,
         max_files: 15,
         open: None,
+        interactive: false,
     });
 
     match command {
@@ -100,14 +117,47 @@ fn main() {
             detailed,
             max_files,
             open,
+            interactive,
         } => {
             println!("\nScanning workspace: {}", path.display());
 
             match scanner::scan_directory(&path, 10) {
                 Ok(artifacts) => {
+                    if artifacts.is_empty() {
+                        println!("\nAll clean! No disposable artifacts found in target path.");
+                        return;
+                    }
+
+                    if interactive {
+                        if let Some(selected) = tui::run_interactive_navigator(&artifacts) {
+                            if selected.is_empty() {
+                                println!("\nNo folders were selected for purging.");
+                            } else {
+                                let total_bytes: u64 = selected.iter().map(|a| a.size_bytes).sum();
+                                println!(
+                                    "\nSelected {} folders ({}) for cleanup.",
+                                    selected.len(),
+                                    format_bytes(total_bytes)
+                                );
+                                let proceed = Confirm::new()
+                                    .with_prompt("Proceed with deletion of selected folders?")
+                                    .default(false)
+                                    .interact()
+                                    .unwrap_or(false);
+                                if proceed {
+                                    let result = cleaner::purge_artifacts(&selected, false);
+                                    ui::display_clean_summary(&result);
+                                } else {
+                                    println!("\nCleanup cancelled. No files were deleted.");
+                                }
+                            }
+                        }
+                        return;
+                    }
+
                     ui::display_artifacts_table(&artifacts);
 
-                    if detailed && !artifacts.is_empty() {
+                    if detailed {
                         for art in &artifacts {
                             let files = inspector::list_files_with_timestamps(&art.path, max_files);
                             let title = format!("{} -> {}", art.project_name, art.pattern);
@@ -115,40 +165,99 @@ fn main() {
                         }
                     }
 
-                    if !artifacts.is_empty() {
-                        if let Some(target_idx) = open {
-                            if target_idx >= 1 && target_idx <= artifacts.len() {
-                                let target_path = &artifacts[target_idx - 1].path;
-                                println!("\nOpening in File Explorer: {}", target_path.display());
-                                if let Err(e) = explorer::open_in_file_explorer(target_path) {
-                                    eprintln!("Error opening folder: {}", e);
-                                }
-                            } else {
-                                eprintln!(
-                                    "\nInvalid folder number {}. Please choose between 1 and {}.",
-                                    target_idx,
-                                    artifacts.len()
-                                );
+                    if let Some(target_idx) = open {
+                        if target_idx >= 1 && target_idx <= artifacts.len() {
+                            let target_path = &artifacts[target_idx - 1].path;
+                            println!("\nOpening in File Explorer: {}", target_path.display());
+                            if let Err(e) = explorer::open_in_file_explorer(target_path) {
+                                eprintln!("Error opening folder: {}", e);
                             }
                         } else {
-                            // Interactive jump prompt
-                            print!(
-                                "\nEnter folder # to open directly in File Explorer [1-{}] (or press Enter to skip): ",
+                            eprintln!(
+                                "\nInvalid folder number {}. Please choose between 1 and {}.",
+                                target_idx,
                                 artifacts.len()
                             );
-                            let _ = std::io::stdout().flush();
-                            let mut input = String::new();
-                            if std::io::stdin().read_line(&mut input).is_ok() {
-                                let trimmed = input.trim();
-                                if let Ok(idx) = trimmed.parse::<usize>() {
-                                    if idx >= 1 && idx <= artifacts.len() {
-                                        let target_path = &artifacts[idx - 1].path;
-                                        println!("Opening in File Explorer: {}", target_path.display());
-                                        if let Err(e) = explorer::open_in_file_explorer(target_path) {
-                                            eprintln!("Error opening folder: {}", e);
+                        }
+                    } else {
+                        // Interactive jump or launch prompt
+                        print!(
+                            "\nEnter folder # to open [1-{}], 'i' for interactive navigator, or press Enter to skip: ",
+                            artifacts.len()
+                        );
+                        let _ = std::io::stdout().flush();
+                        let mut input = String::new();
+                        if std::io::stdin().read_line(&mut input).is_ok() {
+                            let trimmed = input.trim();
+                            if trimmed.eq_ignore_ascii_case("i") {
+                                if let Some(selected) = tui::run_interactive_navigator(&artifacts) {
+                                    if !selected.is_empty() {
+                                        let total_bytes: u64 = selected.iter().map(|a| a.size_bytes).sum();
+                                        println!(
+                                            "\nSelected {} folders ({}) for cleanup.",
+                                            selected.len(),
+                                            format_bytes(total_bytes)
+                                        );
+                                        let proceed = Confirm::new()
+                                            .with_prompt("Proceed with deletion of selected folders?")
+                                            .default(false)
+                                            .interact()
+                                            .unwrap_or(false);
+                                        if proceed {
+                                            let result = cleaner::purge_artifacts(&selected, false);
+                                            ui::display_clean_summary(&result);
+                                        } else {
+                                            println!("\nCleanup cancelled. No files were deleted.");
                                         }
                                     }
                                 }
+                            } else if let Ok(idx) = trimmed.parse::<usize>() {
+                                if idx >= 1 && idx <= artifacts.len() {
+                                    let target_path = &artifacts[idx - 1].path;
+                                    println!("Opening in File Explorer: {}", target_path.display());
+                                    if let Err(e) = explorer::open_in_file_explorer(target_path) {
+                                        eprintln!("Error opening folder: {}", e);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("\nError scanning path: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+
+        Commands::Interactive { path } => {
+            println!("\nScanning workspace: {}", path.display());
+            match scanner::scan_directory(&path, 10) {
+                Ok(artifacts) => {
+                    if artifacts.is_empty() {
+                        println!("\nAll clean! No disposable artifacts found in target path.");
+                        return;
+                    }
+                    if let Some(selected) = tui::run_interactive_navigator(&artifacts) {
+                        if selected.is_empty() {
+                            println!("\nNo folders were selected for purging.");
+                        } else {
+                            let total_bytes: u64 = selected.iter().map(|a| a.size_bytes).sum();
+                            println!(
+                                "\nSelected {} folders ({}) for cleanup.",
+                                selected.len(),
+                                format_bytes(total_bytes)
+                            );
+                            let proceed = Confirm::new()
+                                .with_prompt("Proceed with deletion of selected folders?")
+                                .default(false)
+                                .interact()
+                                .unwrap_or(false);
+                            if proceed {
+                                let result = cleaner::purge_artifacts(&selected, false);
+                                ui::display_clean_summary(&result);
+                            } else {
+                                println!("\nCleanup cancelled. No files were deleted.");
                             }
                         }
                     }
@@ -244,7 +353,12 @@ fn main() {
             }
         }
 
-        Commands::Clean { path, dry_run, yes } => {
+        Commands::Clean {
+            path,
+            dry_run,
+            yes,
+            interactive,
+        } => {
             println!("\nScanning workspace for purgeable folders: {}", path.display());
 
             let artifacts = match scanner::scan_directory(&path, 10) {
@@ -255,17 +369,35 @@ fn main() {
                 }
             };
 
-            ui::display_artifacts_table(&artifacts);
-
             if artifacts.is_empty() {
+                println!("\nAll clean! No disposable artifacts found in target path.");
                 return;
             }
+
+            let targets_to_clean = if interactive {
+                match tui::run_interactive_navigator(&artifacts) {
+                    Some(selected) => {
+                        if selected.is_empty() {
+                            println!("\nNo folders were selected for purging.");
+                            return;
+                        }
+                        selected
+                    }
+                    None => {
+                        println!("\nInteractive selection cancelled. No files were deleted.");
+                        return;
+                    }
+                }
+            } else {
+                ui::display_artifacts_table(&artifacts);
+                artifacts
+            };
 
             if !yes && !dry_run {
                 let confirmed = Confirm::new()
                     .with_prompt(format!(
                         "\nAre you sure you want to permanently delete these {} artifact folders?",
-                        artifacts.len()
+                        targets_to_clean.len()
                     ))
                     .default(false)
                     .interact()
@@ -277,7 +409,7 @@ fn main() {
                 }
             }
 
-            let result = cleaner::purge_artifacts(&artifacts, dry_run);
+            let result = cleaner::purge_artifacts(&targets_to_clean, dry_run);
             ui::display_clean_summary(&result);
         }
     }
