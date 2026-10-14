@@ -31,8 +31,8 @@ pub fn inspect_artifact(artifact_path: &Path, pattern: &ArtifactPattern) -> Arti
 
     let (dir_created, dir_accessed, dir_modified) = get_path_timestamps(artifact_path);
 
-    let mut max_accessed = dir_accessed;
-    let mut max_modified = dir_modified;
+    let mut max_accessed_st: Option<std::time::SystemTime> = None;
+    let mut max_modified_st: Option<std::time::SystemTime> = None;
 
     for entry in WalkDir::new(artifact_path).into_iter().filter_map(|e| e.ok()) {
         if entry.path_is_symlink() {
@@ -43,22 +43,31 @@ pub fn inspect_artifact(artifact_path: &Path, pattern: &ArtifactPattern) -> Arti
             if let Ok(metadata) = entry.metadata() {
                 total_size += metadata.len();
 
-                if let Ok(acc) = metadata.accessed() {
-                    let acc_dt: DateTime<Local> = acc.into();
-                    if max_accessed.is_none_or(|cur| acc_dt > cur) {
-                        max_accessed = Some(acc_dt);
+                // High-performance optimization: sample timestamps up to depth 3
+                // comparing raw SystemTime rather than calling DateTime conversions on every file
+                if entry.depth() <= 3 {
+                    if let Ok(acc) = metadata.accessed() {
+                        if max_accessed_st.is_none_or(|cur| acc > cur) {
+                            max_accessed_st = Some(acc);
+                        }
                     }
-                }
 
-                if let Ok(mod_time) = metadata.modified() {
-                    let mod_dt: DateTime<Local> = mod_time.into();
-                    if max_modified.is_none_or(|cur| mod_dt > cur) {
-                        max_modified = Some(mod_dt);
+                    if let Ok(mod_time) = metadata.modified() {
+                        if max_modified_st.is_none_or(|cur| mod_time > cur) {
+                            max_modified_st = Some(mod_time);
+                        }
                     }
                 }
             }
         }
     }
+
+    let max_accessed = max_accessed_st
+        .map(DateTime::<Local>::from)
+        .or(dir_accessed);
+    let max_modified = max_modified_st
+        .map(DateTime::<Local>::from)
+        .or(dir_modified);
 
     let project_name = artifact_path
         .parent()

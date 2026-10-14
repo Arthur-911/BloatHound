@@ -70,7 +70,11 @@ pub fn analyze_folder_integrity(artifact: &ArtifactInfo) -> IntegrityAnalysis {
     // 2. CUSTOM UN-GENERATED FILE SCAN
     // Check if the user accidentally stored unique personal files inside this folder (.env, .sql, .pem, etc.)
     let mut custom_files = Vec::new();
-    for entry in WalkDir::new(artifact_dir).into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(artifact_dir)
+        .max_depth(3)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         if entry.path_is_symlink() {
             continue;
         }
