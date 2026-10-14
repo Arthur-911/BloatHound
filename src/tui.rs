@@ -5,7 +5,7 @@ use crossterm::{
     style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
     terminal::{self, Clear, ClearType},
 };
-use std::io::{stdout, IsTerminal, Write};
+use std::io::{stdout, Write};
 
 use crate::analyzer::analyze_folder_integrity;
 use crate::explorer::open_in_file_explorer;
@@ -42,11 +42,12 @@ pub fn run_interactive_navigator(artifacts: &[ArtifactInfo]) -> Option<Vec<Artif
         return None;
     }
 
-    if !std::io::stdin().is_terminal() || !stdout().is_terminal() {
-        return None;
-    }
-
     let _guard = RawModeGuard::enter().ok()?;
+
+    // Drain any residual key events from the input buffer (such as the Enter key pressed when typing 'i')
+    while event::poll(std::time::Duration::from_millis(50)).unwrap_or(false) {
+        let _ = event::read();
+    }
 
     let mut items: Vec<TuiItem> = artifacts
         .iter()

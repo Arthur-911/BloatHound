@@ -189,26 +189,36 @@ fn main() {
                         let mut input = String::new();
                         if std::io::stdin().read_line(&mut input).is_ok() {
                             let trimmed = input.trim();
-                            if trimmed.eq_ignore_ascii_case("i") {
-                                if let Some(selected) = tui::run_interactive_navigator(&artifacts) {
-                                    if !selected.is_empty() {
-                                        let total_bytes: u64 = selected.iter().map(|a| a.size_bytes).sum();
-                                        println!(
-                                            "\nSelected {} folders ({}) for cleanup.",
-                                            selected.len(),
-                                            format_bytes(total_bytes)
-                                        );
-                                        let proceed = Confirm::new()
-                                            .with_prompt("Proceed with deletion of selected folders?")
-                                            .default(false)
-                                            .interact()
-                                            .unwrap_or(false);
-                                        if proceed {
-                                            let result = cleaner::purge_artifacts(&selected, false);
-                                            ui::display_clean_summary(&result);
+                            if trimmed.eq_ignore_ascii_case("i")
+                                || trimmed.eq_ignore_ascii_case("nav")
+                                || trimmed.eq_ignore_ascii_case("tui")
+                            {
+                                match tui::run_interactive_navigator(&artifacts) {
+                                    Some(selected) => {
+                                        if !selected.is_empty() {
+                                            let total_bytes: u64 = selected.iter().map(|a| a.size_bytes).sum();
+                                            println!(
+                                                "\nSelected {} folders ({}) for cleanup.",
+                                                selected.len(),
+                                                format_bytes(total_bytes)
+                                            );
+                                            let proceed = Confirm::new()
+                                                .with_prompt("Proceed with deletion of selected folders?")
+                                                .default(false)
+                                                .interact()
+                                                .unwrap_or(false);
+                                            if proceed {
+                                                let result = cleaner::purge_artifacts(&selected, false);
+                                                ui::display_clean_summary(&result);
+                                            } else {
+                                                println!("\nCleanup cancelled. No files were deleted.");
+                                            }
                                         } else {
-                                            println!("\nCleanup cancelled. No files were deleted.");
+                                            println!("\nNo folders were selected for purging.");
                                         }
+                                    }
+                                    None => {
+                                        println!("\nInteractive navigator exited.");
                                     }
                                 }
                             } else if let Ok(idx) = trimmed.parse::<usize>() {
