@@ -36,7 +36,6 @@ The `bloathound` binary will be installed to your Cargo bin directory and availa
 - **Source Code Reference Checking:** Scans project source files to verify whether code directly imports from output folders before classifying them as disposable.
 - **Lifecycle Analytics:** Extracts true file creation, access, and modification timestamps directly from the filesystem.
 - **System Protection:** Hardcoded blocklists prevent scanning or modifying operating system roots, system directories, or `.git` repositories.
-- **Interactive TUI Navigator:** Keyboard-driven terminal interface with arrow key navigation, spacebar multi-selection, select-all toggling, and direct system file manager launching.
 - **Interactive Directory Opening:** Direct integration with the system file manager (Windows File Explorer, macOS Finder, or Linux file managers) to inspect folders before taking action.
 
 ---
@@ -72,29 +71,7 @@ bloathound scan "C:\path\to\projects"
 
 After scanning, the tool displays an overview table with sizes and timestamps, followed by an optional prompt to open any detected folder directly in your system file manager.
 
-### 2. Interactive TUI Navigator
-
-Launch the keyboard-driven terminal navigator directly:
-
-```bash
-bloathound nav
-```
-
-Or run an interactive scan:
-
-```bash
-bloathound scan -i
-```
-
-**Keyboard Controls:**
-- `Up` / `Down` (or `k` / `j`): Scroll through detected artifact directories.
-- `Space`: Toggle checkbox selection (`[X]` / `[ ]`) for individual targets.
-- `A`: Toggle select all safe disposable folders.
-- `O`: Instantly open the highlighted directory in File Explorer / Finder.
-- `Enter`: Proceed to purge selected targets with confirmation.
-- `Q` or `Esc`: Exit navigator without making changes.
-
-### 3. Dependency and Integrity Analysis
+### 2. Dependency and Integrity Analysis
 
 Analyze whether detected folders are linked to project manifests and if deleting them would impact the project:
 
@@ -114,7 +91,7 @@ The analysis checks:
 - Source Imports: Whether sibling source code hard-references the directory.
 - Verdict: Classifies each target as `[SAFE TO DELETE]` or `[MATTERS - KEEP]`.
 
-### 4. Direct Folder Navigation
+### 3. Direct Folder Navigation
 
 Open a project folder directly in File Explorer:
 
@@ -122,7 +99,7 @@ Open a project folder directly in File Explorer:
 bloathound open "C:\path\to\project\target"
 ```
 
-### 5. File-Level Timestamp Inspection
+### 4. File-Level Timestamp Inspection
 
 View the individual files inside detected directories with their creation and modification dates:
 
@@ -136,7 +113,7 @@ Inspect a specific directory's largest files:
 bloathound inspect "path/to/node_modules" --limit 20
 ```
 
-### 6. Safe Cleanup (Dry-Run and Live)
+### 5. Safe Cleanup (Dry-Run and Live)
 
 Preview what would be deleted without touching files:
 

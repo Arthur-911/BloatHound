@@ -5,6 +5,6 @@ pub mod explorer;
 pub mod inspector;
 pub mod models;
 pub mod scanner;
-pub mod tui;
 pub mod ui;
+
 
