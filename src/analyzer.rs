@@ -1,10 +1,11 @@
+use serde::{Deserialize, Serialize};
 use std::fs;
 use walkdir::WalkDir;
 
-use crate::models::ArtifactInfo;
+use crate::models::{format_bytes, ArtifactInfo};
 
 /// Analysis of whether an artifact folder is truly needed or if deleting it has zero negative impact.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IntegrityAnalysis {
     /// Is this folder connected to a valid project manifest (package.json, Cargo.toml, requirements.txt)?
     pub has_manifest: bool,
@@ -21,6 +22,61 @@ pub struct IntegrityAnalysis {
     /// Final Verdict: Is it needed or does it NOT matter if deleted?
     pub is_needed: bool,
     pub verdict_summary: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnalysisItem {
+    pub artifact: ArtifactInfo,
+    pub analysis: IntegrityAnalysis,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnalysisSummary {
+    pub total_artifacts: usize,
+    pub total_bytes: u64,
+    pub human_total_size: String,
+    pub safe_to_delete_count: usize,
+    pub needed_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnalysisReport {
+    pub summary: AnalysisSummary,
+    pub items: Vec<AnalysisItem>,
+}
+
+impl AnalysisReport {
+    pub fn from_artifacts(artifacts: &[ArtifactInfo]) -> Self {
+        let mut items = Vec::new();
+        let mut total_bytes = 0u64;
+        let mut safe_to_delete_count = 0usize;
+        let mut needed_count = 0usize;
+
+        for art in artifacts {
+            let analysis = analyze_folder_integrity(art);
+            total_bytes += art.size_bytes;
+            if analysis.is_needed {
+                needed_count += 1;
+            } else {
+                safe_to_delete_count += 1;
+            }
+            items.push(AnalysisItem {
+                artifact: art.clone(),
+                analysis,
+            });
+        }
+
+        AnalysisReport {
+            summary: AnalysisSummary {
+                total_artifacts: artifacts.len(),
+                total_bytes,
+                human_total_size: format_bytes(total_bytes),
+                safe_to_delete_count,
+                needed_count,
+            },
+            items,
+        }
+    }
 }
 
 const PROJECT_MANIFESTS: &[&str] = &[

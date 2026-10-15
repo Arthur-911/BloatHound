@@ -35,6 +35,10 @@ enum Commands {
         /// Automatically open the Nth artifact folder in File Explorer
         #[arg(short, long)]
         open: Option<usize>,
+
+        /// Output scan results in JSON format
+        #[arg(long)]
+        json: bool,
     },
 
     /// Deep-inspect a specific folder to view files with timestamps
@@ -63,6 +67,10 @@ enum Commands {
         /// Automatically purge all folders that do not matter without asking
         #[arg(short, long)]
         yes: bool,
+
+        /// Output analysis results in JSON format
+        #[arg(long)]
+        json: bool,
     },
 
     /// Purge disposable artifact directories to reclaim disk space
@@ -82,8 +90,6 @@ enum Commands {
 }
 
 fn main() {
-    ui::print_banner();
-
     let cli = Cli::parse();
 
     // Default action: if no subcommand is given, immediately scan the current folder!
@@ -92,7 +98,17 @@ fn main() {
         detailed: false,
         max_files: 15,
         open: None,
+        json: false,
     });
+
+    let is_json = matches!(
+        &command,
+        Commands::Scan { json: true, .. } | Commands::Analyze { json: true, .. }
+    );
+
+    if !is_json {
+        ui::print_banner();
+    }
 
     match command {
         Commands::Scan {
@@ -100,11 +116,41 @@ fn main() {
             detailed,
             max_files,
             open,
+            json,
         } => {
-            println!("\nScanning workspace: {}", path.display());
+            if !json {
+                println!("\nScanning workspace: {}", path.display());
+            }
 
             match scanner::scan_directory(&path, 10) {
-                Ok(artifacts) => {
+                Ok(mut artifacts) => {
+                    if detailed {
+                        for art in &mut artifacts {
+                            let files = inspector::list_files_with_timestamps(&art.path, max_files);
+                            art.files = Some(files);
+                        }
+                    }
+
+                    if json {
+                        let total_bytes: u64 = artifacts.iter().map(|a| a.size_bytes).sum();
+                        let report = bloathound::models::ScanReport {
+                            summary: bloathound::models::ScanSummary {
+                                total_artifacts: artifacts.len(),
+                                total_bytes,
+                                human_total_size: bloathound::models::format_bytes(total_bytes),
+                            },
+                            artifacts,
+                        };
+                        match serde_json::to_string_pretty(&report) {
+                            Ok(json_output) => println!("{}", json_output),
+                            Err(e) => {
+                                eprintln!("Error serializing scan report: {}", e);
+                                std::process::exit(1);
+                            }
+                        }
+                        return;
+                    }
+
                     if artifacts.is_empty() {
                         println!("\nAll clean! No disposable artifacts found in target path.");
                         return;
@@ -114,9 +160,10 @@ fn main() {
 
                     if detailed {
                         for art in &artifacts {
-                            let files = inspector::list_files_with_timestamps(&art.path, max_files);
-                            let title = format!("{} -> {}", art.project_name, art.pattern);
-                            ui::display_files_table(&files, &title);
+                            if let Some(files) = &art.files {
+                                let title = format!("{} -> {}", art.project_name, art.pattern);
+                                ui::display_files_table(files, &title);
+                            }
                         }
                     }
 
@@ -198,8 +245,10 @@ fn main() {
             }
         }
 
-        Commands::Analyze { path, yes } => {
-            println!("\nAnalyzing workspace for project connections and deletion impact: {}", path.display());
+        Commands::Analyze { path, yes, json } => {
+            if !json {
+                println!("\nAnalyzing workspace for project connections and deletion impact: {}", path.display());
+            }
 
             let artifacts = match scanner::scan_directory(&path, 10) {
                 Ok(a) => a,
@@ -208,6 +257,18 @@ fn main() {
                     std::process::exit(1);
                 }
             };
+
+            if json {
+                let report = analyzer::AnalysisReport::from_artifacts(&artifacts);
+                match serde_json::to_string_pretty(&report) {
+                    Ok(json_output) => println!("{}", json_output),
+                    Err(e) => {
+                        eprintln!("Error serializing analysis report: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+                return;
+            }
 
             if artifacts.is_empty() {
                 println!("\nAll clean! No artifacts found.");

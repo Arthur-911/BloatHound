@@ -37,6 +37,7 @@ The `bloathound` binary will be installed to your Cargo bin directory and availa
 - **Lifecycle Analytics:** Extracts true file creation, access, and modification timestamps directly from the filesystem.
 - **System Protection:** Hardcoded blocklists prevent scanning or modifying operating system roots, system directories, or `.git` repositories.
 - **Interactive Directory Opening:** Direct integration with the system file manager (Windows File Explorer, macOS Finder, or Linux file managers) to inspect folders before taking action.
+- **Machine-Readable JSON Output:** Full JSON serialization via `--json` for integration with CI/CD pipelines, shell scripts, and monitoring tools.
 
 ---
 
@@ -125,6 +126,30 @@ Execute an interactive cleanup with confirmation prompts:
 
 ```bash
 bloathound clean .
+```
+
+### 6. Machine-Readable JSON Output
+
+Export clean, parseable JSON for shell scripts, cron jobs, and automation:
+
+```bash
+bloathound scan . --json
+```
+
+Filter outputs with `jq`:
+
+```bash
+# List all detected paths and their byte sizes
+bloathound scan . --json | jq '.artifacts[] | {path: .path, bytes: .size_bytes}'
+
+# Check project analysis in JSON
+bloathound analyze . --json | jq '.items[] | {path: .artifact.path, safe: (.analysis.is_needed | not)}'
+```
+
+Include detailed file breakdown in JSON output:
+
+```bash
+bloathound scan . --json --detailed --max-files 10
 ```
 
 ---

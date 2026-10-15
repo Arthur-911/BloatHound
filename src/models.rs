@@ -1,14 +1,16 @@
 use chrono::{DateTime, Local};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Verdict {
     NotNeeded,   // Inactive > 30 days: safe to purge
     Review,      // Inactive 14 - 30 days
     KeepActive,  // Active <= 14 days: needed for active development
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArtifactInfo {
     pub path: PathBuf,
     pub project_name: String,
@@ -20,9 +22,11 @@ pub struct ArtifactInfo {
     pub accessed_at: Option<DateTime<Local>>,
     pub modified_at: Option<DateTime<Local>>,
     pub recreate_cmd: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub files: Option<Vec<FileDetail>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileDetail {
     pub path: PathBuf,
     pub relative_path: String,
@@ -30,6 +34,19 @@ pub struct FileDetail {
     pub created_at: Option<DateTime<Local>>,
     pub accessed_at: Option<DateTime<Local>>,
     pub modified_at: Option<DateTime<Local>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScanSummary {
+    pub total_artifacts: usize,
+    pub total_bytes: u64,
+    pub human_total_size: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScanReport {
+    pub summary: ScanSummary,
+    pub artifacts: Vec<ArtifactInfo>,
 }
 
 pub fn format_bytes(bytes: u64) -> String {

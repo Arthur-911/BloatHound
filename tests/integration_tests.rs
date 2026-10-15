@@ -110,6 +110,7 @@ fn test_cleaner_safety_block_on_arbitrary_folder() {
         accessed_at: None,
         modified_at: None,
         recreate_cmd: "test".to_string(),
+        files: None,
     };
 
     let result = purge_artifact(&info, false);
@@ -142,6 +143,7 @@ fn test_assess_necessity() {
         accessed_at: Some(recent),
         modified_at: Some(recent),
         recreate_cmd: "npm install".to_string(),
+        files: None,
     };
 
     let (v_recent, _) = info.assess_necessity();
@@ -184,6 +186,7 @@ fn test_integrity_analyzer() {
         accessed_at: None,
         modified_at: None,
         recreate_cmd: "npm install".to_string(),
+        files: None,
     };
 
     // Standard recreatable folder -> does not matter if deleted
@@ -215,6 +218,7 @@ fn test_purge_artifact_nonexistent() {
         accessed_at: None,
         modified_at: None,
         recreate_cmd: "npm install".to_string(),
+        files: None,
     };
     assert!(purge_artifact(&info, false).is_ok());
 }
@@ -232,6 +236,75 @@ fn test_validate_scan_path_ancestor_protection() {
     assert!(result.is_err());
     let err_msg = result.unwrap_err();
     assert!(err_msg.contains("protected system directory"));
+}
+
+#[test]
+fn test_json_scan_report_serialization() {
+    use bloathound::models::{ArtifactInfo, ScanReport, ScanSummary};
+    use std::path::PathBuf;
+
+    let artifact = ArtifactInfo {
+        path: PathBuf::from("/test/node_modules"),
+        project_name: "test_proj".to_string(),
+        category: "Node.js".to_string(),
+        pattern: "node_modules".to_string(),
+        size_bytes: 1048576,
+        file_count: 42,
+        created_at: None,
+        accessed_at: None,
+        modified_at: None,
+        recreate_cmd: "npm install".to_string(),
+        files: None,
+    };
+
+    let report = ScanReport {
+        summary: ScanSummary {
+            total_artifacts: 1,
+            total_bytes: 1048576,
+            human_total_size: "1.0 MB".to_string(),
+        },
+        artifacts: vec![artifact],
+    };
+
+    let json_str = serde_json::to_string_pretty(&report).unwrap();
+    assert!(json_str.contains("\"total_artifacts\": 1"));
+    assert!(json_str.contains("\"test_proj\""));
+    assert!(json_str.contains("\"node_modules\""));
+    assert!(json_str.contains("\"1.0 MB\""));
+
+    let deserialized: ScanReport = serde_json::from_str(&json_str).unwrap();
+    assert_eq!(deserialized.summary.total_artifacts, 1);
+    assert_eq!(deserialized.artifacts[0].project_name, "test_proj");
+}
+
+#[test]
+fn test_json_analysis_report_serialization() {
+    use bloathound::analyzer::AnalysisReport;
+    use bloathound::models::ArtifactInfo;
+    use std::path::PathBuf;
+
+    let artifact = ArtifactInfo {
+        path: PathBuf::from("/test/target"),
+        project_name: "test_rust".to_string(),
+        category: "Rust".to_string(),
+        pattern: "target".to_string(),
+        size_bytes: 2048,
+        file_count: 5,
+        created_at: None,
+        accessed_at: None,
+        modified_at: None,
+        recreate_cmd: "cargo build".to_string(),
+        files: None,
+    };
+
+    let report = AnalysisReport::from_artifacts(&[artifact]);
+    let json_str = serde_json::to_string_pretty(&report).unwrap();
+    assert!(json_str.contains("\"total_artifacts\": 1"));
+    assert!(json_str.contains("\"test_rust\""));
+
+    let deserialized: AnalysisReport = serde_json::from_str(&json_str).unwrap();
+    assert_eq!(deserialized.summary.total_artifacts, 1);
+    assert_eq!(deserialized.items[0].artifact.project_name, "test_rust");
 }
 
 

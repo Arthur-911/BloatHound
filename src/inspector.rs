@@ -87,6 +87,7 @@ pub fn inspect_artifact(artifact_path: &Path, pattern: &ArtifactPattern) -> Arti
         accessed_at: max_accessed,
         modified_at: max_modified,
         recreate_cmd: pattern.recreate_cmd.to_string(),
+        files: None,
     }
 }
 
