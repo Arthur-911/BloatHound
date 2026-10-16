@@ -4,6 +4,10 @@ A command-line tool written in Rust to audit, inspect, and safely remove disposa
 
 Unlike standard disk cleaning scripts that delete files indiscriminately, BloatHound inspects project structure, manifest files (`package.json`, `Cargo.toml`, `requirements.txt`), and file modification timestamps to distinguish between harmless build artifacts and active user data.
 
+<p align="center">
+  <img src="docs/images/scan_demo.png" alt="BloatHound Terminal Scan Demo" width="100%" />
+</p>
+
 ---
 
 ## Installation
@@ -88,6 +92,10 @@ Scan and analyze an external folder:
 bloathound analyze "C:\path\to\projects"
 ```
 
+<p align="center">
+  <img src="docs/images/analyze_demo.png" alt="BloatHound Dependency and Integrity Analysis" width="100%" />
+</p>
+
 The analysis checks:
 - Manifest Link: Whether a valid manifest exists to regenerate the folder.
 - Custom Files: Whether sensitive non-compiler files (`.env`, `.db`) are present.
@@ -115,6 +123,10 @@ Inspect a specific directory's largest files:
 ```bash
 bloathound inspect "path/to/node_modules" --limit 20
 ```
+
+<p align="center">
+  <img src="docs/images/inspect_demo.png" alt="BloatHound File Lifecycle Inspection Breakdown" width="100%" />
+</p>
 
 ### 5. Safe Cleanup (Dry-Run and Live)
 
