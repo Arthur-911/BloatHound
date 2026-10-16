@@ -104,23 +104,14 @@ pub fn analyze_folder_integrity(artifact: &ArtifactInfo) -> IntegrityAnalysis {
     let parent_dir = artifact_dir.parent().unwrap_or(artifact_dir);
 
     // 1. MANIFEST CONNECTION CHECK
-    // Check if there is an active project manifest in the parent or grandparent folder
-    let mut manifest_found = None;
-    for manifest in PROJECT_MANIFESTS {
-        let parent_manifest = parent_dir.join(manifest);
-        if parent_manifest.exists() {
-            manifest_found = Some(manifest.to_string());
-            break;
-        }
-        if let Some(grandparent) = parent_dir.parent() {
-            let gp_manifest = grandparent.join(manifest);
-            if gp_manifest.exists() {
-                manifest_found = Some(manifest.to_string());
-                break;
-            }
-        }
-    }
-
+    let manifest_found = PROJECT_MANIFESTS
+        .iter()
+        .copied()
+        .find(|&manifest| {
+            parent_dir.join(manifest).exists()
+                || parent_dir.parent().is_some_and(|gp| gp.join(manifest).exists())
+        })
+        .map(String::from);
     let has_manifest = manifest_found.is_some();
 
     // 2. CUSTOM UN-GENERATED FILE SCAN
@@ -169,6 +160,13 @@ pub fn analyze_folder_integrity(artifact: &ArtifactInfo) -> IntegrityAnalysis {
     let mut source_references = Vec::new();
 
     if parent_dir.exists() {
+        let import_patterns = [
+            format!("require(\"./{}\"", folder_name),
+            format!("from \"./{}\"", folder_name),
+            format!("from './{}'", folder_name),
+            format!("import \"./{}\"", folder_name),
+        ];
+
         for entry in WalkDir::new(parent_dir)
             .max_depth(3)
             .into_iter()
@@ -189,17 +187,7 @@ pub fn analyze_folder_integrity(artifact: &ArtifactInfo) -> IntegrityAnalysis {
                     }
 
                     if let Ok(content) = fs::read_to_string(path) {
-                        // Look for explicit runtime import or require statements
-                        let import_pattern_a = format!("require(\"./{}\"", folder_name);
-                        let import_pattern_b = format!("from \"./{}\"", folder_name);
-                        let import_pattern_c = format!("from './{}'", folder_name);
-                        let import_pattern_d = format!("import \"./{}\"", folder_name);
-
-                        if content.contains(&import_pattern_a)
-                            || content.contains(&import_pattern_b)
-                            || content.contains(&import_pattern_c)
-                            || content.contains(&import_pattern_d)
-                        {
+                        if import_patterns.iter().any(|pat| content.contains(pat)) {
                             source_references.push(path.display().to_string());
                             if source_references.len() >= 3 {
                                 break;

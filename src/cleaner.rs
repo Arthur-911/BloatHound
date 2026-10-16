@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use crate::config::get_default_patterns;
+use crate::config::find_pattern;
 use crate::models::{format_bytes, ArtifactInfo};
 
 #[derive(Debug, Default)]
@@ -72,8 +72,7 @@ pub fn purge_artifact(info: &ArtifactInfo, dry_run: bool) -> Result<(), String> 
         .and_then(|n| n.to_str())
         .ok_or_else(|| "Invalid directory name".to_string())?;
 
-    let patterns = get_default_patterns();
-    if !patterns.contains_key(folder_name) {
+    if find_pattern(folder_name).is_none() {
         return Err(format!(
             "Safety block: Directory '{}' is not in the safe disposable list.",
             folder_name

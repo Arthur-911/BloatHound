@@ -3,7 +3,6 @@ use comfy_table::presets::UTF8_FULL;
 use comfy_table::{Cell, CellAlignment, Color, ContentArrangement, Table};
 use colored::*;
 
-use crate::analyzer::analyze_folder_integrity;
 use crate::cleaner::CleanResult;
 use crate::models::{format_bytes, ArtifactInfo, FileDetail, Verdict};
 
@@ -14,19 +13,23 @@ pub fn print_banner() {
     println!("{}", "===================================================".cyan());
 }
 
+fn create_table(headers: Vec<Cell>) -> Table {
+    let mut table = Table::new();
+    table
+        .load_preset(UTF8_FULL)
+        .apply_modifier(UTF8_ROUND_CORNERS)
+        .set_content_arrangement(ContentArrangement::Dynamic)
+        .set_header(headers);
+    table
+}
+
 pub fn display_artifacts_table(artifacts: &[ArtifactInfo]) {
     if artifacts.is_empty() {
         println!("\n{}", "All clean! No disposable artifacts found in target path.".bold().green());
         return;
     }
 
-    let mut table = Table::new();
-    table
-        .load_preset(UTF8_FULL)
-        .apply_modifier(UTF8_ROUND_CORNERS)
-        .set_content_arrangement(ContentArrangement::Dynamic);
-
-    table.set_header(vec![
+    let mut table = create_table(vec![
         Cell::new("#").fg(Color::DarkGrey),
         Cell::new("Status / Verdict").fg(Color::White),
         Cell::new("Project").fg(Color::White),
@@ -80,7 +83,6 @@ pub fn display_audit_report(artifacts: &[ArtifactInfo]) {
     let mut not_needed = Vec::new();
     let mut review = Vec::new();
     let mut keep = Vec::new();
-
     let mut not_needed_bytes: u64 = 0;
 
     for item in artifacts {
@@ -123,41 +125,23 @@ pub fn display_audit_report(artifacts: &[ArtifactInfo]) {
         }
     }
 
-    // 2. REVIEW
-    if !review.is_empty() {
-        println!(
-            "\n{}",
-            format!("REVIEW - MODERATE INACTIVITY ({} folders):", review.len())
-                .bold()
-                .yellow()
-        );
-        for item in &review {
-            let (_, reason) = item.assess_necessity();
-            println!(
-                "  - {} ({}) - {}",
-                item.project_name.bold().white(),
-                item.human_size().bold().green(),
-                reason.dimmed()
-            );
-        }
-    }
-
-    // 3. KEEP / ACTIVE
-    if !keep.is_empty() {
-        println!(
-            "\n{}",
-            format!("KEEP - IN ACTIVE USE ({} folders):", keep.len())
-                .bold()
-                .green()
-        );
-        for item in &keep {
-            let (_, reason) = item.assess_necessity();
-            println!(
-                "  - {} ({}) - {}",
-                item.project_name.bold().white(),
-                item.human_size().bold().green(),
-                reason.dimmed()
-            );
+    // 2. REVIEW & 3. KEEP
+    for (title, items, is_yellow) in [
+        ("REVIEW - MODERATE INACTIVITY", &review, true),
+        ("KEEP - IN ACTIVE USE", &keep, false),
+    ] {
+        if !items.is_empty() {
+            let heading = format!("{} ({} folders):", title, items.len()).bold();
+            println!("\n{}", if is_yellow { heading.yellow() } else { heading.green() });
+            for item in items {
+                let (_, reason) = item.assess_necessity();
+                println!(
+                    "  - {} ({}) - {}",
+                    item.project_name.bold().white(),
+                    item.human_size().bold().green(),
+                    reason.dimmed()
+                );
+            }
         }
     }
 
@@ -170,26 +154,18 @@ pub fn display_audit_report(artifacts: &[ArtifactInfo]) {
     println!("{}", "---------------------------------------------------".cyan());
 }
 
-/// Displays deep structural dependency & project connection analysis:
-/// Checks if it's connected to other files, and whether it MATTERS if deleted.
-pub fn display_integrity_analysis_table(artifacts: &[ArtifactInfo]) {
+pub fn display_analysis_items_table(items: &[crate::analyzer::AnalysisItem]) {
     println!("\n{}", "=====================================================================".bold().cyan());
     println!("{}", "       STRUCTURAL INTEGRITY & DEPENDENCY ANALYSIS REPORT             ".bold().white());
     println!("{}", "    (Checks project linkage, custom files, and if deleting matters)   ".dimmed());
     println!("{}", "=====================================================================".bold().cyan());
 
-    if artifacts.is_empty() {
+    if items.is_empty() {
         println!("\nAll clean! No artifacts found to analyze.");
         return;
     }
 
-    let mut table = Table::new();
-    table
-        .load_preset(UTF8_FULL)
-        .apply_modifier(UTF8_ROUND_CORNERS)
-        .set_content_arrangement(ContentArrangement::Dynamic);
-
-    table.set_header(vec![
+    let mut table = create_table(vec![
         Cell::new("#").fg(Color::DarkGrey),
         Cell::new("Project / Artifact").fg(Color::White),
         Cell::new("Size").fg(Color::Green).set_alignment(CellAlignment::Right),
@@ -200,8 +176,9 @@ pub fn display_integrity_analysis_table(artifacts: &[ArtifactInfo]) {
         Cell::new("Detailed Reason").fg(Color::White),
     ]);
 
-    for (idx, item) in artifacts.iter().enumerate() {
-        let analysis = analyze_folder_integrity(item);
+    for (idx, item) in items.iter().enumerate() {
+        let analysis = &item.analysis;
+        let art = &item.artifact;
 
         let manifest_text = match &analysis.manifest_file {
             Some(m) => format!("Linked ({})", m),
@@ -229,21 +206,24 @@ pub fn display_integrity_analysis_table(artifacts: &[ArtifactInfo]) {
             ("[SAFE TO DELETE]", Color::Green)
         };
 
-        let label = format!("{} ({})", item.project_name, item.pattern);
-
         table.add_row(vec![
             Cell::new((idx + 1).to_string()),
-            Cell::new(label),
-            Cell::new(item.human_size()).fg(Color::Green).set_alignment(CellAlignment::Right),
+            Cell::new(format!("{} ({})", art.project_name, art.pattern)),
+            Cell::new(art.human_size()).fg(Color::Green).set_alignment(CellAlignment::Right),
             Cell::new(manifest_text).fg(manifest_color),
             Cell::new(custom_files_text).fg(custom_files_color),
             Cell::new(source_refs_text).fg(source_refs_color),
             Cell::new(verdict_text).fg(verdict_color),
-            Cell::new(analysis.verdict_summary),
+            Cell::new(&analysis.verdict_summary),
         ]);
     }
 
     println!("\n{}", table);
+}
+
+pub fn display_integrity_analysis_table(artifacts: &[ArtifactInfo]) {
+    let report = crate::analyzer::AnalysisReport::from_artifacts(artifacts);
+    display_analysis_items_table(&report.items);
 }
 
 pub fn display_files_table(files: &[FileDetail], folder_name: &str) {
@@ -252,13 +232,7 @@ pub fn display_files_table(files: &[FileDetail], folder_name: &str) {
         return;
     }
 
-    let mut table = Table::new();
-    table
-        .load_preset(UTF8_FULL)
-        .apply_modifier(UTF8_ROUND_CORNERS)
-        .set_content_arrangement(ContentArrangement::Dynamic);
-
-    table.set_header(vec![
+    let mut table = create_table(vec![
         Cell::new("#").fg(Color::DarkGrey),
         Cell::new("Relative File Path").fg(Color::White),
         Cell::new("Size").fg(Color::Green).set_alignment(CellAlignment::Right),

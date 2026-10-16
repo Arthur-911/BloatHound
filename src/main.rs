@@ -89,6 +89,23 @@ enum Commands {
     },
 }
 
+fn scan_or_exit(path: &std::path::Path) -> Vec<bloathound::models::ArtifactInfo> {
+    match scanner::scan_directory(path, 10) {
+        Ok(a) => a,
+        Err(e) => {
+            eprintln!("\nError scanning path: {}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn open_explorer(path: &std::path::Path) {
+    println!("Opening in File Explorer: {}", path.display());
+    if let Err(e) = explorer::open_in_file_explorer(path) {
+        eprintln!("Error opening folder: {}", e);
+    }
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -122,90 +139,73 @@ fn main() {
                 println!("\nScanning workspace: {}", path.display());
             }
 
-            match scanner::scan_directory(&path, 10) {
-                Ok(mut artifacts) => {
-                    if detailed {
-                        for art in &mut artifacts {
-                            let files = inspector::list_files_with_timestamps(&art.path, max_files);
-                            art.files = Some(files);
-                        }
-                    }
+            let mut artifacts = scan_or_exit(&path);
 
-                    if json {
-                        let total_bytes: u64 = artifacts.iter().map(|a| a.size_bytes).sum();
-                        let report = bloathound::models::ScanReport {
-                            summary: bloathound::models::ScanSummary {
-                                total_artifacts: artifacts.len(),
-                                total_bytes,
-                                human_total_size: bloathound::models::format_bytes(total_bytes),
-                            },
-                            artifacts,
-                        };
-                        match serde_json::to_string_pretty(&report) {
-                            Ok(json_output) => println!("{}", json_output),
-                            Err(e) => {
-                                eprintln!("Error serializing scan report: {}", e);
-                                std::process::exit(1);
-                            }
-                        }
-                        return;
-                    }
+            if detailed {
+                for art in &mut artifacts {
+                    art.files = Some(inspector::list_files_with_timestamps(&art.path, max_files));
+                }
+            }
 
-                    if artifacts.is_empty() {
-                        println!("\nAll clean! No disposable artifacts found in target path.");
-                        return;
-                    }
-
-                    ui::display_artifacts_table(&artifacts);
-
-                    if detailed {
-                        for art in &artifacts {
-                            if let Some(files) = &art.files {
-                                let title = format!("{} -> {}", art.project_name, art.pattern);
-                                ui::display_files_table(files, &title);
-                            }
-                        }
-                    }
-
-                    if let Some(target_idx) = open {
-                        if target_idx >= 1 && target_idx <= artifacts.len() {
-                            let target_path = &artifacts[target_idx - 1].path;
-                            println!("\nOpening in File Explorer: {}", target_path.display());
-                            if let Err(e) = explorer::open_in_file_explorer(target_path) {
-                                eprintln!("Error opening folder: {}", e);
-                            }
-                        } else {
-                            eprintln!(
-                                "\nInvalid folder number {}. Please choose between 1 and {}.",
-                                target_idx,
-                                artifacts.len()
-                            );
-                        }
-                    } else {
-                        // Interactive jump prompt
-                        print!(
-                            "\nEnter folder # to open directly in File Explorer [1-{}] (or press Enter to skip): ",
-                            artifacts.len()
-                        );
-                        let _ = std::io::stdout().flush();
-                        let mut input = String::new();
-                        if std::io::stdin().read_line(&mut input).is_ok() {
-                            let trimmed = input.trim();
-                            if let Ok(idx) = trimmed.parse::<usize>() {
-                                if idx >= 1 && idx <= artifacts.len() {
-                                    let target_path = &artifacts[idx - 1].path;
-                                    println!("Opening in File Explorer: {}", target_path.display());
-                                    if let Err(e) = explorer::open_in_file_explorer(target_path) {
-                                        eprintln!("Error opening folder: {}", e);
-                                    }
-                                }
-                            }
-                        }
+            if json {
+                let total_bytes: u64 = artifacts.iter().map(|a| a.size_bytes).sum();
+                let report = bloathound::models::ScanReport {
+                    summary: bloathound::models::ScanSummary {
+                        total_artifacts: artifacts.len(),
+                        total_bytes,
+                        human_total_size: bloathound::models::format_bytes(total_bytes),
+                    },
+                    artifacts,
+                };
+                match serde_json::to_string_pretty(&report) {
+                    Ok(json_output) => println!("{}", json_output),
+                    Err(e) => {
+                        eprintln!("Error serializing scan report: {}", e);
+                        std::process::exit(1);
                     }
                 }
-                Err(e) => {
-                    eprintln!("\nError scanning path: {}", e);
-                    std::process::exit(1);
+                return;
+            }
+
+            if artifacts.is_empty() {
+                println!("\nAll clean! No disposable artifacts found in target path.");
+                return;
+            }
+
+            ui::display_artifacts_table(&artifacts);
+
+            if detailed {
+                for art in &artifacts {
+                    if let Some(files) = &art.files {
+                        let title = format!("{} -> {}", art.project_name, art.pattern);
+                        ui::display_files_table(files, &title);
+                    }
+                }
+            }
+
+            if let Some(target_idx) = open {
+                if target_idx >= 1 && target_idx <= artifacts.len() {
+                    open_explorer(&artifacts[target_idx - 1].path);
+                } else {
+                    eprintln!(
+                        "\nInvalid folder number {}. Please choose between 1 and {}.",
+                        target_idx,
+                        artifacts.len()
+                    );
+                }
+            } else {
+                print!(
+                    "\nEnter folder # to open directly in File Explorer [1-{}] (or press Enter to skip): ",
+                    artifacts.len()
+                );
+                let _ = std::io::stdout().flush();
+                let mut input = String::new();
+                if std::io::stdin().read_line(&mut input).is_ok() {
+                    if let Ok(idx) = input.trim().parse::<usize>() {
+                        if idx >= 1 && idx <= artifacts.len() {
+                            open_explorer(&artifacts[idx - 1].path);
+                        }
+                    }
                 }
             }
         }
@@ -231,18 +231,12 @@ fn main() {
                 .unwrap_or(false);
 
             if confirmed {
-                if let Err(e) = explorer::open_in_file_explorer(&path) {
-                    eprintln!("Error: {}", e);
-                }
+                open_explorer(&path);
             }
         }
 
         Commands::Open { path } => {
-            println!("\nOpening in File Explorer: {}", path.display());
-            if let Err(e) = explorer::open_in_file_explorer(&path) {
-                eprintln!("\nError: {}", e);
-                std::process::exit(1);
-            }
+            open_explorer(&path);
         }
 
         Commands::Analyze { path, yes, json } => {
@@ -250,16 +244,10 @@ fn main() {
                 println!("\nAnalyzing workspace for project connections and deletion impact: {}", path.display());
             }
 
-            let artifacts = match scanner::scan_directory(&path, 10) {
-                Ok(a) => a,
-                Err(e) => {
-                    eprintln!("\nError scanning path: {}", e);
-                    std::process::exit(1);
-                }
-            };
+            let artifacts = scan_or_exit(&path);
+            let report = analyzer::AnalysisReport::from_artifacts(&artifacts);
 
             if json {
-                let report = analyzer::AnalysisReport::from_artifacts(&artifacts);
                 match serde_json::to_string_pretty(&report) {
                     Ok(json_output) => println!("{}", json_output),
                     Err(e) => {
@@ -275,11 +263,13 @@ fn main() {
                 return;
             }
 
-            ui::display_integrity_analysis_table(&artifacts);
+            ui::display_analysis_items_table(&report.items);
 
-            let does_not_matter: Vec<_> = artifacts
+            let does_not_matter: Vec<_> = report
+                .items
                 .into_iter()
-                .filter(|a| !analyzer::analyze_folder_integrity(a).is_needed)
+                .filter(|item| !item.analysis.is_needed)
+                .map(|item| item.artifact)
                 .collect();
 
             if does_not_matter.is_empty() {
@@ -287,18 +277,14 @@ fn main() {
                 return;
             }
 
-            let proceed = if yes {
-                true
-            } else {
-                Confirm::new()
-                    .with_prompt(format!(
-                        "\nWould you like to safely purge all {} folders that DO NOT MATTER?",
-                        does_not_matter.len()
-                    ))
-                    .default(false)
-                    .interact()
-                    .unwrap_or(false)
-            };
+            let proceed = yes || Confirm::new()
+                .with_prompt(format!(
+                    "\nWould you like to safely purge all {} folders that DO NOT MATTER?",
+                    does_not_matter.len()
+                ))
+                .default(false)
+                .interact()
+                .unwrap_or(false);
 
             if proceed {
                 let result = cleaner::purge_artifacts(&does_not_matter, false);
@@ -315,14 +301,7 @@ fn main() {
         } => {
             println!("\nScanning workspace for purgeable folders: {}", path.display());
 
-            let artifacts = match scanner::scan_directory(&path, 10) {
-                Ok(a) => a,
-                Err(e) => {
-                    eprintln!("\nError scanning path: {}", e);
-                    std::process::exit(1);
-                }
-            };
-
+            let artifacts = scan_or_exit(&path);
             ui::display_artifacts_table(&artifacts);
 
             if artifacts.is_empty() {

@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
-use crate::config::{get_default_patterns, PROTECTED_SYSTEM_DIRS};
+use crate::config::{find_pattern, PROTECTED_SYSTEM_DIRS};
 use crate::inspector::inspect_artifact;
 use crate::models::ArtifactInfo;
 
@@ -52,7 +52,6 @@ pub fn validate_scan_path(target: &Path) -> Result<PathBuf, String> {
 
 pub fn scan_directory(root: &Path, max_depth: usize) -> Result<Vec<ArtifactInfo>, String> {
     let valid_root = validate_scan_path(root)?;
-    let patterns = get_default_patterns();
     let mut artifacts = Vec::new();
 
     let mut it = WalkDir::new(&valid_root)
@@ -81,7 +80,7 @@ pub fn scan_directory(root: &Path, max_depth: usize) -> Result<Vec<ArtifactInfo>
         }
 
         // Check if directory matches any known disposable artifact pattern
-        if let Some(pattern) = patterns.get(name.as_ref()) {
+        if let Some(pattern) = find_pattern(name.as_ref()) {
             let path = entry.path();
             let info = inspect_artifact(path, pattern);
             artifacts.push(info);
