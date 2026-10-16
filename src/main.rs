@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 #[command(
     name = "bloathound",
     author = "Arthur <https://github.com/Arthur-911>",
-    version = "0.2.3",
+    version = "0.2.4",
     about = "Lightning-fast, safety-first developer artifact and cache purger with file lifecycle analytics."
 )]
 struct Cli {

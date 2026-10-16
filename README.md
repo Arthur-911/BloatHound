@@ -36,8 +36,10 @@ The `bloathound` binary will be installed to your Cargo bin directory and availa
 - **Source Code Reference Checking:** Scans project source files to verify whether code directly imports from output folders before classifying them as disposable.
 - **Lifecycle Analytics:** Extracts true file creation, access, and modification timestamps directly from the filesystem.
 - **System Protection:** Hardcoded blocklists prevent scanning or modifying operating system roots, system directories, or `.git` repositories.
-- **Interactive Directory Opening:** Direct integration with the system file manager (Windows File Explorer, macOS Finder, or Linux file managers) to inspect folders before taking action.
+- **Intelligent Size Sorting & Paging:** Discovered artifacts are automatically sorted by size descending so the largest space consumers appear at `# 1`. Supports `--limit <N>` and `--all` to prevent terminal buffer overflow.
+- **Execution Diagnostics & Timers:** Measures and displays exact run durations (e.g. `Scan time = 52ms`) across all operations.
 - **Machine-Readable JSON Output:** Full JSON serialization via `--json` for integration with CI/CD pipelines, shell scripts, and monitoring tools.
+- **Compact & High Performance:** Sub-megabyte binary with zero-allocation pattern dispatch.
 
 ---
 
