@@ -1,8 +1,10 @@
 use clap::{Parser, Subcommand};
+use colored::*;
 use bloathound::{analyzer, cleaner, explorer, inspector, scanner, ui};
 use dialoguer::Confirm;
 use std::io::Write;
 use std::path::PathBuf;
+use std::time::{Duration, Instant};
 
 #[derive(Parser)]
 #[command(
@@ -89,6 +91,17 @@ enum Commands {
     },
 }
 
+fn format_duration(d: Duration) -> String {
+    let millis = d.as_millis();
+    if millis < 1 {
+        format!("{:.1}ms", d.as_micros() as f64 / 1000.0)
+    } else if millis < 1000 {
+        format!("{}ms", millis)
+    } else {
+        format!("{:.2}s", d.as_secs_f64())
+    }
+}
+
 fn scan_or_exit(path: &std::path::Path) -> Vec<bloathound::models::ArtifactInfo> {
     match scanner::scan_directory(path, 10) {
         Ok(a) => a,
@@ -139,6 +152,7 @@ fn main() {
                 println!("\nScanning workspace: {}", path.display());
             }
 
+            let start = Instant::now();
             let mut artifacts = scan_or_exit(&path);
 
             if detailed {
@@ -146,6 +160,7 @@ fn main() {
                     art.files = Some(inspector::list_files_with_timestamps(&art.path, max_files));
                 }
             }
+            let elapsed = start.elapsed();
 
             if json {
                 let total_bytes: u64 = artifacts.iter().map(|a| a.size_bytes).sum();
@@ -169,10 +184,12 @@ fn main() {
 
             if artifacts.is_empty() {
                 println!("\nAll clean! No disposable artifacts found in target path.");
+                println!("Scan time = {}", format_duration(elapsed).bold().cyan());
                 return;
             }
 
             ui::display_artifacts_table(&artifacts);
+            println!("Scan time = {}", format_duration(elapsed).bold().cyan());
 
             if detailed {
                 for art in &artifacts {
@@ -217,12 +234,15 @@ fn main() {
             }
 
             println!("\nInspecting folder: {}", path.display());
+            let start = Instant::now();
             let files = inspector::list_files_with_timestamps(&path, limit);
+            let elapsed = start.elapsed();
             let folder_name = path
                 .file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or("target");
             ui::display_files_table(&files, folder_name);
+            println!("Inspect time = {}", format_duration(elapsed).bold().cyan());
 
             let confirmed = Confirm::new()
                 .with_prompt("\nOpen this folder in File Explorer?")
@@ -244,8 +264,10 @@ fn main() {
                 println!("\nAnalyzing workspace for project connections and deletion impact: {}", path.display());
             }
 
+            let start = Instant::now();
             let artifacts = scan_or_exit(&path);
             let report = analyzer::AnalysisReport::from_artifacts(&artifacts);
+            let elapsed = start.elapsed();
 
             if json {
                 match serde_json::to_string_pretty(&report) {
@@ -260,10 +282,12 @@ fn main() {
 
             if artifacts.is_empty() {
                 println!("\nAll clean! No artifacts found.");
+                println!("Scan time = {}", format_duration(elapsed).bold().cyan());
                 return;
             }
 
             ui::display_analysis_items_table(&report.items);
+            println!("Analyze time = {}", format_duration(elapsed).bold().cyan());
 
             let does_not_matter: Vec<_> = report
                 .items
@@ -301,8 +325,11 @@ fn main() {
         } => {
             println!("\nScanning workspace for purgeable folders: {}", path.display());
 
+            let start = Instant::now();
             let artifacts = scan_or_exit(&path);
+            let scan_elapsed = start.elapsed();
             ui::display_artifacts_table(&artifacts);
+            println!("Scan time = {}", format_duration(scan_elapsed).bold().cyan());
 
             if artifacts.is_empty() {
                 println!("\nAll clean! No disposable artifacts found in target path.");
@@ -325,8 +352,11 @@ fn main() {
                 }
             }
 
+            let clean_start = Instant::now();
             let result = cleaner::purge_artifacts(&artifacts, dry_run);
+            let clean_elapsed = clean_start.elapsed();
             ui::display_clean_summary(&result);
+            println!("Clean time = {}", format_duration(clean_elapsed).bold().cyan());
         }
     }
 }
