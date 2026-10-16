@@ -24,6 +24,10 @@ fn create_table(headers: Vec<Cell>) -> Table {
 }
 
 pub fn display_artifacts_table(artifacts: &[ArtifactInfo]) {
+    display_artifacts_table_limited(artifacts, Some(30));
+}
+
+pub fn display_artifacts_table_limited(artifacts: &[ArtifactInfo], limit: Option<usize>) {
     if artifacts.is_empty() {
         println!("\n{}", "All clean! No disposable artifacts found in target path.".bold().green());
         return;
@@ -41,11 +45,10 @@ pub fn display_artifacts_table(artifacts: &[ArtifactInfo]) {
         Cell::new("Exact Folder Path").fg(Color::Magenta),
     ]);
 
-    let mut total_bytes: u64 = 0;
+    let total_bytes: u64 = artifacts.iter().map(|a| a.size_bytes).sum();
+    let display_count = limit.map(|l| l.min(artifacts.len())).unwrap_or(artifacts.len());
 
-    for (idx, item) in artifacts.iter().enumerate() {
-        total_bytes += item.size_bytes;
-
+    for (idx, item) in artifacts.iter().take(display_count).enumerate() {
         let (verdict, _) = item.assess_necessity();
         let (status_text, status_color) = match verdict {
             Verdict::NotNeeded => ("[DISPOSABLE]", Color::Red),
@@ -67,6 +70,19 @@ pub fn display_artifacts_table(artifacts: &[ArtifactInfo]) {
     }
 
     println!("\n{}", table);
+
+    if display_count < artifacts.len() {
+        println!(
+            "\n{}",
+            format!(
+                "Showing top {} largest folders (out of {} found). Use --all to display all.",
+                display_count,
+                artifacts.len()
+            )
+            .dimmed()
+        );
+    }
+
     println!(
         "\n{} {} across {} artifact folders.",
         "Total Reclaimable Space:".bold(),
@@ -155,6 +171,10 @@ pub fn display_audit_report(artifacts: &[ArtifactInfo]) {
 }
 
 pub fn display_analysis_items_table(items: &[crate::analyzer::AnalysisItem]) {
+    display_analysis_items_table_limited(items, Some(30));
+}
+
+pub fn display_analysis_items_table_limited(items: &[crate::analyzer::AnalysisItem], limit: Option<usize>) {
     println!("\n{}", "=====================================================================".bold().cyan());
     println!("{}", "       STRUCTURAL INTEGRITY & DEPENDENCY ANALYSIS REPORT             ".bold().white());
     println!("{}", "    (Checks project linkage, custom files, and if deleting matters)   ".dimmed());
@@ -176,7 +196,9 @@ pub fn display_analysis_items_table(items: &[crate::analyzer::AnalysisItem]) {
         Cell::new("Detailed Reason").fg(Color::White),
     ]);
 
-    for (idx, item) in items.iter().enumerate() {
+    let display_count = limit.map(|l| l.min(items.len())).unwrap_or(items.len());
+
+    for (idx, item) in items.iter().take(display_count).enumerate() {
         let analysis = &item.analysis;
         let art = &item.artifact;
 
@@ -219,6 +241,18 @@ pub fn display_analysis_items_table(items: &[crate::analyzer::AnalysisItem]) {
     }
 
     println!("\n{}", table);
+
+    if display_count < items.len() {
+        println!(
+            "\n{}",
+            format!(
+                "Showing top {} largest folders (out of {} analyzed). Use --all to display all.",
+                display_count,
+                items.len()
+            )
+            .dimmed()
+        );
+    }
 }
 
 pub fn display_integrity_analysis_table(artifacts: &[ArtifactInfo]) {

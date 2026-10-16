@@ -34,6 +34,14 @@ enum Commands {
         #[arg(long, default_value = "15")]
         max_files: usize,
 
+        /// Maximum artifact folders to display in table view (defaults to top 30)
+        #[arg(long, default_value = "30")]
+        limit: usize,
+
+        /// Display all artifact folders without truncation
+        #[arg(short, long)]
+        all: bool,
+
         /// Automatically open the Nth artifact folder in File Explorer
         #[arg(short, long)]
         open: Option<usize>,
@@ -69,6 +77,14 @@ enum Commands {
         /// Automatically purge all folders that do not matter without asking
         #[arg(short, long)]
         yes: bool,
+
+        /// Maximum artifact folders to display in table view (defaults to top 30)
+        #[arg(long, default_value = "30")]
+        limit: usize,
+
+        /// Display all artifact folders without truncation
+        #[arg(short, long)]
+        all: bool,
 
         /// Output analysis results in JSON format
         #[arg(long)]
@@ -127,6 +143,8 @@ fn main() {
         path: PathBuf::from("."),
         detailed: false,
         max_files: 15,
+        limit: 30,
+        all: false,
         open: None,
         json: false,
     });
@@ -145,6 +163,8 @@ fn main() {
             path,
             detailed,
             max_files,
+            limit,
+            all,
             open,
             json,
         } => {
@@ -188,7 +208,8 @@ fn main() {
                 return;
             }
 
-            ui::display_artifacts_table(&artifacts);
+            let table_limit = if all { None } else { Some(limit) };
+            ui::display_artifacts_table_limited(&artifacts, table_limit);
             println!("Scan time = {}", format_duration(elapsed).bold().cyan());
 
             if detailed {
@@ -259,7 +280,13 @@ fn main() {
             open_explorer(&path);
         }
 
-        Commands::Analyze { path, yes, json } => {
+        Commands::Analyze {
+            path,
+            yes,
+            limit,
+            all,
+            json,
+        } => {
             if !json {
                 println!("\nAnalyzing workspace for project connections and deletion impact: {}", path.display());
             }
@@ -286,7 +313,8 @@ fn main() {
                 return;
             }
 
-            ui::display_analysis_items_table(&report.items);
+            let table_limit = if all { None } else { Some(limit) };
+            ui::display_analysis_items_table_limited(&report.items, table_limit);
             println!("Analyze time = {}", format_duration(elapsed).bold().cyan());
 
             let does_not_matter: Vec<_> = report

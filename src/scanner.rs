@@ -90,5 +90,8 @@ pub fn scan_directory(root: &Path, max_depth: usize) -> Result<Vec<ArtifactInfo>
         }
     }
 
+    // Sort by largest artifact size first so top results are most impactful
+    artifacts.sort_by_key(|a| std::cmp::Reverse(a.size_bytes));
+
     Ok(artifacts)
 }
